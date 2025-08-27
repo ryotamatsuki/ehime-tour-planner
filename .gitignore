@@ -1,0 +1,5 @@
+# APIキー・secrets
+.streamlit/secrets.toml
+.env
+*.key
+*.pem
