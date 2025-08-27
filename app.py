@@ -41,6 +41,19 @@ with st.sidebar:
     start_date = st.date_input("開始日 (任意)", value=date.today())
     party = st.text_input("同行者（例: 大人2・小学生1）", "大人2")
     transport = st.selectbox("移動手段", ["公共交通", "自家用車", "レンタカー", "自転車"], index=0)
+    
+    st.divider()
+    st.markdown("##### 発着地 (任意)")
+    start_end_options = ["指定なし", "松山空港", "JR松山駅", "松山市駅", "松山観光港", "その他（自由記述）"]
+    start_end_choice = st.selectbox("場所を選択", start_end_options, index=0)
+    
+    start_end_point = ""
+    if start_end_choice == "その他（自由記述）":
+        start_end_point = st.text_input("自由記述欄", placeholder="例: 今治港、自宅など")
+    else:
+        start_end_point = start_end_choice
+    st.divider()
+
     interests = st.multiselect(
         "関心テーマ",
         ["温泉", "城・歴史", "サイクリング", "自然景観", "島めぐり", "グルメ", "アート", "祭り・イベント", "体験・アクティビティ"],
@@ -108,6 +121,7 @@ if generate_btn:
             start_area=start_area,
             with_kids=with_kids,
             pace=pace,
+            start_end_point=start_end_point,
             sources=used_sources,
             context=top_chunks,
         )
