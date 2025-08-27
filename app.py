@@ -59,7 +59,14 @@ with st.sidebar:
         ["温泉", "城・歴史", "サイクリング", "自然景観", "島めぐり", "グルメ", "アート", "祭り・イベント", "体験・アクティビティ"],
         default=["温泉", "城・歴史"],
     )
-    start_area = st.selectbox("主な訪問エリア", ["指定なし", "中予(松山・道後)", "東予(今治・西条など)", "南予(大洲・内子・宇和島など)"])
+    area_options = ["指定なし", "中予(松山・道後)", "東予(今治・西条など)", "南予(大洲・内子・宇和島など)", "その他（自由記述）"]
+    area_choice = st.selectbox("主な訪問エリア", area_options, index=0)
+    
+    start_area = ""
+    if area_choice == "その他（自由記述）":
+        start_area = st.text_input("エリアを自由に入力", placeholder="例: 愛南町、鬼北町")
+    else:
+        start_area = area_choice
     with_kids = st.checkbox("子連れ考慮")
     pace = st.select_slider("1日の詰め込み度", options=["ゆったり", "標準", "ぎっしり"], value="標準")
     generate_btn = st.button("プラン生成", type="primary")
