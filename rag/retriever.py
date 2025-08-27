@@ -34,36 +34,71 @@ class EhimeRetriever:
         self.gclient = genai.Client()  # GEMINI_API_KEY は環境/Secrets から
 
     # --- 1) 検索→抽出→要約/クリーニング ---
-    def search_and_prepare(self, query: str, max_results: int = 8) -> List[RetrievalItem]:
-        resp = self.client.search(
-            query=query,
-            search_depth="advanced",
-            include_raw_content="markdown",
-            include_answer=False,
-            include_domains=["iyokannet.jp"],
-            max_results=max_results,
-            chunks_per_source=3,
-        )
+    def search_and_prepare(self, query: str, max_results: int = 8, add_web_search: bool = False) -> List[RetrievalItem]:
         items: List[RetrievalItem] = []
-        for r in resp.get("results", []):
-            url = r.get("url", "")
-            title = r.get("title", "") or url
-            raw_md = r.get("raw_content", "") or "n".join(r.get("content", []))
-            cleaned = self._clean_text(raw_md)
-            if not cleaned:
-                # 最低限 HTML 抽出を試行
-                ext = self.client.extract(url)
-                cleaned = self._clean_text(ext.get("text", ""))
-            if cleaned:
-                items.append(
-                    RetrievalItem(
+        seen_urls = set()
+
+        # 配分を決定
+        if add_web_search:
+            iyokan_results_count = max_results // 2
+            web_results_count = max_results - iyokan_results_count
+        else:
+            iyokan_results_count = max_results
+            web_results_count = 0
+
+        def _process_results(results, is_iyokan: bool):
+            for r in results:
+                url = r.get("url", "")
+                if not url or url in seen_urls:
+                    continue
+
+                title = r.get("title", "") or url
+                raw_md = r.get("raw_content", "") or "\n".join(r.get("content", []))
+                
+                site_name = "いよ観ネット" if is_iyokan else url.split('/')[2].replace("www.", "")
+
+                cleaned = self._clean_text(raw_md)
+                if not cleaned:
+                    try:
+                        ext = self.client.extract(url)
+                        cleaned = self._clean_text(ext.get("text", ""))
+                    except Exception:
+                        continue
+                
+                if cleaned:
+                    items.append(RetrievalItem(
                         title=title[:180],
                         url=url,
-                        site="いよ観ネット",
-                        content=cleaned[:10000],  # 入力長の安全確保
+                        site=site_name,
+                        content=cleaned[:10000],
                         content_chars=len(cleaned),
-                    )
+                    ))
+                    seen_urls.add(url)
+
+        # 1. いよ観ネットを検索
+        if iyokan_results_count > 0:
+            try:
+                resp_iyokan = self.client.search(
+                    query=query, search_depth="advanced", include_raw_content="markdown",
+                    include_answer=False, include_domains=["iyokannet.jp"],
+                    max_results=iyokan_results_count, chunks_per_source=3, timeout=120
                 )
+                _process_results(resp_iyokan.get("results", []), is_iyokan=True)
+            except Exception as e:
+                print(f"Error searching iyokannet.jp: {e}")
+
+        # 2. ウェブ全体を検索 (追加が有効な場合)
+        if web_results_count > 0:
+            try:
+                resp_web = self.client.search(
+                    query=query, search_depth="advanced", include_raw_content="markdown",
+                    include_answer=False, max_results=web_results_count, 
+                    chunks_per_source=3, timeout=120
+                )
+                _process_results(resp_web.get("results", []), is_iyokan=False)
+            except Exception as e:
+                print(f"Error searching web: {e}")
+
         return items
 
     def _clean_text(self, text: str) -> str:
@@ -80,14 +115,42 @@ class EhimeRetriever:
 
     # --- 2) 埋め込みユーティリティ ---
     def _embed(self, texts: List[str], task_type: str, dim: int = 768) -> np.ndarray:
-        cfg = types.EmbedContentConfig(task_type=task_type, output_dimensionality=dim)
-        res = self.gclient.models.embed_content(
-            model="gemini-embedding-001",
-            contents=texts,
-            config=cfg,
-        )
-        vecs = [np.array(e.values, dtype="float32") for e in res.embeddings]
-        return np.vstack(vecs)
+        all_vecs = []
+        # Process in batches to respect API limits (e.g., 100 texts per batch)
+        # and add a delay to respect rate limits (e.g., 60 requests per minute)
+        batch_size = 100 
+        
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i : i + batch_size]
+            if not batch_texts:
+                continue
+            
+            cfg = types.EmbedContentConfig(task_type=task_type, output_dimensionality=dim)
+            try:
+                res = self.gclient.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=batch_texts,
+                    config=cfg,
+                )
+                
+                batch_vecs = [np.array(e.values, dtype="float32") for e in res.embeddings]
+                all_vecs.extend(batch_vecs)
+                
+                # If there are more batches to process, wait to avoid hitting rate limits.
+                if i + batch_size < len(texts):
+                    print(f"Embedding batch {i//batch_size + 1} complete. Waiting for 5 seconds...")
+                    time.sleep(5)
+
+            except Exception as e:
+                print(f"An error occurred during embedding batch {i//batch_size + 1}: {e}")
+                # Continue to the next batch if one fails
+                continue
+
+        if not all_vecs:
+            # Handle case where all embedding calls failed
+            return np.array([], dtype="float32").reshape(0, dim)
+
+        return np.vstack(all_vecs)
 
     # --- 3) ベクトル化 → 検索 ---
     def _build_index(self, chunks: List[str]):

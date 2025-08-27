@@ -55,13 +55,18 @@ with st.sidebar:
 colL, colR = st.columns([0.55, 0.45])
 
 with colL:
-    st.subheader("1) 関連ソース検索 (いよ観ネット)")
+    st.subheader("1) 関連ソース検索")
+    add_web_search = st.checkbox("ウェブ検索の結果も追加する", value=False, help="「いよ観ネット」に加えて、Web全体からも関連情報を検索します。")
     q_default = "愛媛 観光 モデルコース 道後温泉 松山城"
     query = st.text_input("検索キーワード（必要に応じて編集）", q_default)
     max_results = st.slider("最大取得サイト数", 3, 15, 8)
     if st.button("関連ページを収集"):
         with st.spinner("Tavilyで検索・要約中..."):
-            items = retriever.search_and_prepare(query=query, max_results=max_results)
+            items = retriever.search_and_prepare(
+                query=query, 
+                max_results=max_results,
+                add_web_search=add_web_search
+            )
         st.session_state["items"] = [i.model_dump() for i in items]
         st.success(f"{len(items)} 件の候補を取り込みました。右ペインで内容を確認できます。")
 
