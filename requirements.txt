@@ -1,0 +1,11 @@
+streamlit>=1.36
+google-genai>=1.0.0
+numpy>=1.26
+pandas>=2.0
+faiss-cpu>=1.8.0.post1
+tavily-python>=0.5.0
+beautifulsoup4>=4.12
+tiktoken>=0.7
+pydeck>=0.9
+python-dateutil>=2.9
+pydantic>=2.8
