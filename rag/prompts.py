@@ -1,5 +1,12 @@
 import json
-from google.generativeai import types
+# rag/prompts.py（先頭の import 部）
+# 旧: from google.generativeai import types
+try:
+    from google.genai import types  # 新SDK（google-genai）
+except ModuleNotFoundError:
+    # ローカルで旧SDKしかない場合のフォールバック（任意）
+    from google.generativeai import types  # 旧SDK（google-generativeai）
+
 
 # Converted to a dictionary to be compatible with the current library version
 ITINERARY_SCHEMA = {
