@@ -7,8 +7,8 @@ from dateutil.relativedelta import relativedelta
 import streamlit as st
 import pandas as pd
 
-import google.generativeai as genai
-from google.generativeai import types
+from google import genai
+from google.genai import types
 
 from rag.retriever import EhimeRetriever, RetrievalItem
 from rag.prompts import build_plan_prompt, ITINERARY_SCHEMA, build_refine_plan_prompt
@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 st.title("Ehime Tour Planner (愛媛RAGプランナー)")
-st.caption("Tavily検索 + Gemini 1.5 Flash で いよ観ネットを参照しながら旅程を自動作成。出典URLを明示し、原文転載は行いません。")
+st.caption("Tavily検索 + Gemini 2.5 Flash で いよ観ネットを参照しながら旅程を自動作成。出典URLを明示し、原文転載は行いません。")
 
 # --- Secrets / Clients ---
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
@@ -30,9 +30,8 @@ if not GEMINI_API_KEY or not TAVILY_API_KEY:
     st.error("GEMINI_API_KEY と TAVILY_API_KEY を Secrets に設定してください")
     st.stop()
 
-# Gemini Client
-genai.configure(api_key=GEMINI_API_KEY)
-client = genai.GenerativeModel(model_name="gemini-2.5-flash")
+# Gemini Client (google-genai)
+client = genai.Client(api_key=GEMINI_API_KEY)
 retriever = EhimeRetriever(api_key=TAVILY_API_KEY)
 
 # --- Session State ---
@@ -135,9 +134,10 @@ if generate_btn:
             with_kids=with_kids, pace=pace, start_end_point=start_end_point,
             sources=used_sources, context=top_chunks,
         )
-        resp = client.generate_content(
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
             contents=prompt,
-            generation_config=types.GenerationConfig(
+            config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=ITINERARY_SCHEMA,
             ),
@@ -191,10 +191,10 @@ if prompt := st.chat_input("プランの修正点を入力してください"):
                 existing_plan=st.session_state.plan_json,
                 user_request=prompt,
             )
-            
-            resp = client.generate_content(
+            resp = client.models.generate_content(
+                model="gemini-2.5-flash",
                 contents=refine_prompt,
-                generation_config=types.GenerationConfig(
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=ITINERARY_SCHEMA,
                 ),
