@@ -241,7 +241,7 @@ class EhimeRetriever:
             "**原文の連続した引用は禁止。必ず言い換え・要約で**。最大400字。nn" + text[:4000]
         )
         resp = self.gclient.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             contents=prompt,
             config=types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
