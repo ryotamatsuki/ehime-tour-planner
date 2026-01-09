@@ -3,6 +3,7 @@ import re
 import time
 import html
 import hashlib
+import json
 from typing import List, Tuple
 
 import numpy as np
@@ -186,53 +187,55 @@ class EhimeRetriever:
         return chunks
 
     def retrieve_for_plan(self, items: List[RetrievalItem], user_query: str, k: int = 8):
-        # すべての候補をチャンク化
         chunk_texts, chunk_meta = [], []
         for it in items:
             chunks = self._chunk(it.content)
             for ch in chunks:
                 chunk_texts.append(ch)
                 chunk_meta.append({"title": it.title, "url": it.url, "site": it.site})
-        
+    
         if not chunk_texts:
             return [], []
-
-        # インデックス作成
+    
         index, X = self._build_index(chunk_texts)
         if X.shape[0] == 0:
             return [], []
-            
+    
         q = self._embed([user_query], task_type="RETRIEVAL_QUERY")
         ids, scores = self._search_index(index, X, q, topk=k)
-        
-        selected = []
+    
+        # 1) まず「URLあたり1チャンク」に絞る（ここが効く）
+        picked = []
         used_sources = []
         seen_urls = set()
-
-        for i, idx in enumerate(ids):
+    
+        for idx in ids:
             meta = chunk_meta[idx]
-            # 同一URLの過度な重複を避ける
-            key = meta["url"]
-            if key not in seen_urls:
-                seen_urls.add(key)
-                used_sources.append(meta)
-            
-            # 原文貼付ではなく "要点要約" を Gemini に一度かけて圧縮
-            try:
-                print(f"Summarizing chunk {i+1}/{len(ids)}: {meta['title']}")
-                summary = self._summarize_for_context(chunk_texts[idx])
-                selected.append(f"出典: {meta['title']} | {meta['url']}\n要点:\n{summary}")
-                
-                # 最後の1回以外は待機する
-                if i < len(ids) - 1:
-                    print(f"Waiting for 6 seconds to respect API rate limits...")
-                    time.sleep(6)
-
-            except Exception as e:
-                print(f"Could not summarize chunk {i+1}: {e}")
+            url = meta["url"]
+            if url in seen_urls:
                 continue
-
+            seen_urls.add(url)
+            used_sources.append(meta)
+            picked.append(idx)
+            # 無料枠前提なら 4〜5 程度が安全（任意で調整）
+            if len(picked) >= min(k, 5):
+                break
+    
+        if not picked:
+            return [], []
+    
+        # 2) 要約をまとめて1回だけ実行
+        texts_to_sum = [chunk_texts[idx] for idx in picked]
+        print(f"Summarizing {len(texts_to_sum)} chunks in one request...")
+        summaries = self._summarize_for_context_batch(texts_to_sum)
+    
+        selected = []
+        for idx, summary in zip(picked, summaries):
+            meta = chunk_meta[idx]
+            selected.append(f"出典: {meta['title']} | {meta['url']}\n要点:\n{summary}")
+    
         return selected, used_sources
+
 
     def _summarize_for_context(self, text: str) -> str:
         # いよ観ネットのポリシーに配慮: 引用ではなく短い要点箇条書き
@@ -248,3 +251,53 @@ class EhimeRetriever:
             ),
         )
         return resp.text.strip()
+
+    def _summarize_for_context_batch(self, texts: List[str]) -> List[str]:
+        """
+        複数チャンクを1回の generate_content で要約して返す（順序維持）。
+        返り値は texts と同じ長さの summary リスト。
+        """
+        # JSONで返させる（順序通りの配列）
+        joined = "\n\n".join(
+            [f"### CHUNK {i+1}\n{t[:4000]}" for i, t in enumerate(texts)]
+        )
+    
+        prompt = (
+            "以下の複数の観光記事テキストを、それぞれ日本語で要点要約してください。\n"
+            "- 各チャンクは固有名詞と実用情報（場所・体験・時期・所要時間・注意点）を中心に5点以内\n"
+            "- 原文の連続した引用は禁止。必ず言い換え・要約で\n"
+            "- 1チャンクあたり最大400字\n"
+            "出力は必ず JSON で、次の形式にしてください：\n"
+            '{"summaries": ["要約1", "要約2", "..."]}\n\n'
+            + joined
+        )
+    
+        # 503/429 対策：軽いリトライ（必要最小限）
+        last_err = None
+        for attempt in range(4):
+            try:
+                resp = self.gclient.models.generate_content(
+                    model="gemini-2.5-flash-lite",
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        # thinking を切って軽量化したい場合（任意）
+                        "thinking_config": {"thinking_budget": 0},
+                    },
+                )
+                data = json.loads(resp.text)
+                summaries = data.get("summaries", [])
+                # 長さ不一致の保険
+                if not isinstance(summaries, list) or len(summaries) != len(texts):
+                    return ["" for _ in texts]
+                return [str(s).strip() for s in summaries]
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                # 429/503 の場合だけ待って再試行
+                if ("429" in msg) or ("RESOURCE_EXHAUSTED" in msg) or ("503" in msg) or ("UNAVAILABLE" in msg) or ("overloaded" in msg):
+                    time.sleep(min(60, 2 ** attempt * 4))
+                    continue
+                raise
+        raise last_err
+
