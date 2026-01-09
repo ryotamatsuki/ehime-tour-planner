@@ -137,11 +137,12 @@ if generate_btn:
         resp = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=ITINERARY_SCHEMA,
-            ),
+            config={
+            "response_mime_type": "application/json",
+            "response_json_schema": ITINERARY_SCHEMA,  # JSON Schema (dict)
+            },
         )
+
         st.session_state.plan_json = json.loads(resp.text)
         st.session_state.messages = [{
             "role": "assistant",
@@ -194,11 +195,12 @@ if prompt := st.chat_input("プランの修正点を入力してください"):
             resp = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=refine_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=ITINERARY_SCHEMA,
-                ),
+                config={
+                    "response_mime_type": "application/json",
+                    "response_json_schema": ITINERARY_SCHEMA,
+                },
             )
+
             try:
                 new_plan = json.loads(resp.text)
                 st.session_state.plan_json = new_plan
