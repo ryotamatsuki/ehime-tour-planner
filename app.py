@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 st.title("Ehime Tour Planner (愛媛RAGプランナー)")
-st.caption("Tavily検索 + Gemini 2.5 Flash で いよ観ネットを参照しながら旅程を自動作成。出典URLを明示し、原文転載は行いません。")
+st.caption("Tavily検索 + gemini-2.5-flash-lite で いよ観ネットを参照しながら旅程を自動作成。出典URLを明示し、原文転載は行いません。")
 
 # --- Secrets / Clients ---
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
@@ -135,7 +135,7 @@ if generate_btn:
             sources=used_sources, context=top_chunks,
         )
         resp = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             contents=prompt,
             config={
             "response_mime_type": "application/json",
@@ -193,7 +193,7 @@ if prompt := st.chat_input("プランの修正点を入力してください"):
                 user_request=prompt,
             )
             resp = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash-lite",
                 contents=refine_prompt,
                 config={
                     "response_mime_type": "application/json",
