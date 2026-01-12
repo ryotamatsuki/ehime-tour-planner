@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI旅行プランナーのご紹介 - 愛媛県庁</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', 'Arial', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Meiryo', sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        header {
+            text-align: center;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 2em;
+        }
+        header p {
+            font-size: 1.1em;
+            color: #555;
+            margin: 10px 0 0;
+        }
+        h2 {
+            font-size: 1.6em;
+            color: #333;
+            border-left: 5px solid #007bff;
+            padding-left: 10px;
+            margin-top: 40px;
+        }
+        p, li {
+            font-size: 1em;
+        }
+        .highlight {
+            background-color: #e7f3ff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #b3d7ff;
+            margin-top: 20px;
+        }
+        .highlight h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #eee;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+        .interactive-demo {
+            margin-top: 30px;
+            padding: 25px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        textarea {
+            width: 95%;
+            height: 80px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #ai-response {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: 'Meiryo', sans-serif;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>AI旅行プランナーのご紹介</h1>
+            <p>RAG技術を活用した愛媛県観光のためのAIアシスタント</p>
+        </header>
+
+        <section>
+            <h2>愛媛県職員の皆様へ</h2>
+            <p>
+                この資料は、生成AIを活用して業務効率化や新たな価値創出を目指す皆様へ、新しいツールの可能性をご紹介するものです。
+                ここに紹介する「AI旅行プランナー」は、対話型AI（LLM）と愛媛県独自の観光情報を組み合わせたアプリケーションです。
+            </p>
+        </section>
+
+        <section>
+            <h2>どうやって作ったの？ - AIとの「バイブコーディング」</h2>
+            <p>
+                このアプリケーションは、専門のプログラマーがコードを一行一行書いたものではありません。
+                <strong>Gemini CLI</strong> というツールを使い、AIに対して「こんなアプリを作りたい」と自然な言葉で指示を出し、AIにプログラムを書いてもらう<strong>「バイブコーディング（Vibe Coding）」</strong>という手法で開発されました。
+            </p>
+            <div class="highlight">
+                <h3>バイブコーディングとは？</h3>
+                <p>
+                    直訳すると「雰囲気でプログラミングする」。設計図を細かく描くのではなく、AIに「こんな感じのものをお願い！」と要点や雰囲気を伝えて、具体的な形にしてもらう開発スタイルです。<br>
+                    <strong>人間が監督やディレクター</strong>になり、<strong>AIが超優秀なプログラマー</strong>として働くイメージです。これにより、プログラミング初心者でも迅速にアイデアを形にできます。
+                </p>
+            </div>
+        </section>
+
+        <section>
+            <h2>このAIは何がすごい？ - RAG（ラグ）技術</h2>
+            <p>
+                このAIは、ただの物知りなAIではありません。<strong>RAG (Retrieval-Augmented Generation)</strong> という技術を使っています。
+            </p>
+            <div class="highlight">
+                <h3>RAGをカーナビで例えると…</h3>
+                <ul>
+                    <li><strong>普通のAI：</strong>全世界の大まかな地図は持っているが、地方の細い道や最近できたお店は知らない。</li>
+                    <li><strong>RAG搭載AI：</strong>全世界の地図に加え、<strong>「愛媛県の詳細観光マップ（最新版）」</strong>を常に参照しながら案内してくれる。</li>
+                </ul>
+                <p>
+                    このAIは、私たちが用意した愛媛県の観光地、グルメ、イベントなどの信頼できる情報（＝詳細観光マップ）を基に回答を生成するため、より正確で魅力的な旅行プランを作成できます。
+                </p>
+            </div>
+        </section>
+
+        <section class="interactive-demo">
+            <h2>試してみよう！</h2>
+            <p>下のボックスに、あなたが考えた旅行の要望を自由に入力して、AIにプラン作成を依頼してみてください。</p>
+            <form id="demo-form">
+                <textarea id="prompt" placeholder="例：松山城と道後温泉を中心に、1日で歴史と癒やしを満喫できるプランを考えてください。"></textarea>
+                <button type="submit">AIにプランを作成させる</button>
+            </form>
+            <div id="ai-response">
+                <!-- AIの応答がここに表示されます -->
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>この資料はGemini CLIによるバイブコーディングで生成されました。</p>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('demo-form').addEventListener('submit', function(event) {
+            event.preventDefault(); // フォームの実際の送信を防ぐ
+
+            const responseArea = document.getElementById('ai-response');
+            const promptText = document.getElementById('prompt').value;
+
+            // ローディング表示
+            responseArea.style.visibility = 'visible';
+            responseArea.style.opacity = '1';
+            responseArea.innerHTML = 'AIがプランを考えています...🤖';
+
+            // 2秒後にダミーの応答を表示する
+            setTimeout(() => {
+                let responseHtml = '';
+                if (promptText.includes('松山') || promptText.includes('道後')) {
+                    responseHtml = `
+<h4>【AI提案】松山歴史散策と道後温泉癒やしの1日プラン</h4>
+<p>承知いたしました。松山城と道後温泉を巡りながら、歴史と癒やしを満喫する1日プランをご提案します。</p>
+<ul style="list-style-type: none; padding-left: 0;">
+    <li><strong>9:00 | 松山城を満喫</strong><br>現存12天守の一つ、松山城へ。リフトで楽々登城し、天守閣から松山市内を一望します。</li>
+    <li><strong>12:00 | 大街道でランチ</strong><br>松山の中心商店街、大街道へ移動。名物の鯛めしやご当地グルメを楽しみましょう。</li>
+    <li><strong>14:00 | 坂の上の雲ミュージアム</strong><br>司馬遼太郎の小説『坂の上の雲』の世界に触れます。安藤忠雄氏設計の美しい建築も見どころです。</li>
+    <li><strong>16:00 | 道後温泉街を散策</strong><br>日本最古の温泉、道後温泉へ。本館の歴史を感じたり、足湯で一息ついたり、商店街でお土産を探したりして過ごします。</li>
+    <li><strong>17:30 | 道後温泉で入浴</strong><br>旅の締めくくりに、歴史ある温泉で汗を流し、心身ともにリフレッシュしてください。</li>
+</ul>
+<p>このプランはあくまで一例です。ご希望に合わせて「B級グルメを追加して」のように、さらに調整できますよ。</p>
+                    `;
+                } else {
+                    responseHtml = `
+<h4>【AI提案】愛媛満喫プラン</h4>
+<p>ご要望ありがとうございます！愛媛の魅力を詰め込んだプランをご提案します。</p>
+<p>申し訳ありません、このデモでは具体的なプランを生成できません。しかし、実際のアプリケーションでは、あなたが入力した「${promptText}」というご要望に応じて、愛媛県内の観光データベースから最適な情報を探し出し、オリジナルの旅行プランを数秒で作成します。</p>
+<p>例えば、「サイクリングがしたい」「美味しい海の幸が食べたい」といったキーワードから、しまなみ海道や八幡浜の海鮮市場などを組み込んだ旅程を自動でご提案可能です。</p>
+                    `;
+                }
+                responseArea.innerHTML = responseHtml;
+            }, 2000);
+        });
+    </script>
+
+</body>
+</html>
