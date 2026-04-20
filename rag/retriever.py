@@ -35,7 +35,12 @@ class EhimeRetriever:
         self.gclient = genai.Client()  # GEMINI_API_KEY は環境/Secrets から
 
     # --- 1) 検索→抽出→要約/クリーニング ---
-    def search_and_prepare(self, query: str, max_results: int = 8, add_web_search: bool = False) -> List[RetrievalItem]:
+    def search_and_prepare(
+        self,
+        query: str,
+        max_results: int = 8,
+        add_web_search: bool = False,
+    ) -> List[RetrievalItem]:
         items: List[RetrievalItem] = []
         seen_urls = set()
 
