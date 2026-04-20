@@ -1,0 +1,24 @@
+{
+  "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk_lualatex",
+      "command": "latexmk",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-lualatex",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk (lualatex)",
+      "tools": [
+        "latexmk_lualatex"
+      ]
+    }
+  ]
+}
