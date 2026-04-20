@@ -1,0 +1,273 @@
+PWD C:\Users\Owner\Desktop\workspace_new\proj_k_ehime-tour-planner\matsuo_iwasawa
+INPUT .\ehime_tour_planner_report.tex
+OUTPUT ehime_tour_planner_report.log
+OUTPUT ehime_tour_planner_report.log
+INPUT C:\Program Files\MiKTeX\tex\latex\latexconfig\lualatexquotejobname.lua
+INPUT C:\Program Files\MiKTeX\tex\latex\base\ltluatex.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-main.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-init.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs-basic.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs-basic-merged.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs-compat.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs-extended.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\lualibs\lualibs-extended-merged.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-log.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\fontloader-basics-gen.lua
+OUTPUT C:\Users\Owner\AppData\Local\MiKTeX\m_t_x_t_e_s_t.tmp
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-parsers.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-configuration.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-status.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\fontloader-2023-12-28.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-fallback.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-multiscript.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-scripts.lua
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\ScriptExtensions.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\Scripts.txt
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-loaders.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-database.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-unicode.lua
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\UnicodeData.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\UnicodeData.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\PropList.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\WordBreakProperty.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\SpecialCasing.txt
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\lua-uni-algos\lua-uni-case.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\lua-uni-algos\lua-uni-parse.lua
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\CaseFolding.txt
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-realpath.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-colors.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-resolvers.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-features.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\lua-uni-algos\lua-uni-normalize.lua
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\UnicodeData.txt
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-arabic.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-harf-define.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-harf-var-cff2.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-harf-var-t2-writer.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-harf-var-ttf.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-harf-plug.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-letterspace.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-embolden.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-notdef.lua
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\UnicodeData.txt
+INPUT C:\Program Files\MiKTeX\tex\generic\unicode-data\PropList.txt
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-suppress.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-szss.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-auxiliary.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-tounicode.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-case.lua
+INPUT C:\Program Files\MiKTeX\tex\luatex\luaotfload\luaotfload-bcp47.lua
+INPUT C:\Program Files\MiKTeX\tex\latex\l3kernel\expl3.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\lua-uni-algos\lua-uni-stage-tables.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltjsarticle.cls
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltjsarticle.cls
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja-core.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja-core.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\infwarerr\infwarerr.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\infwarerr\infwarerr.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexbase\luatexbase.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexbase\luatexbase.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\ctablestack\ctablestack.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\ctablestack\ctablestack.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\ltxcmds\ltxcmds.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\ltxcmds\ltxcmds.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\pdftexcmds\pdftexcmds.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\pdftexcmds\pdftexcmds.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\iftex.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\iftex.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\pdftexcmds\pdftexcmds.lua
+INPUT C:\Program Files\MiKTeX\tex\latex\xkeyval\xkeyval.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\xkeyval\xkeyval.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\xkeyval.tex
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\xkeyval.tex
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\xkvutils.tex
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\xkvutils.tex
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\keyval.tex
+INPUT C:\Program Files\MiKTeX\tex\generic\xkeyval\keyval.tex
+INPUT C:\Program Files\MiKTeX\tex\latex\etoolbox\etoolbox.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\etoolbox\etoolbox.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\everyhook\everyhook.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\everyhook\everyhook.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\svn-prov\svn-prov.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\svn-prov\svn-prov.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-unicode-ccfix.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-base.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\lualatex\lua-ul\pre_append_to_vlist_filter.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-rmlgbm.lua
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\ltj-cid-auto-adobe-japan1.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-lotf_aux.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-charrange.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-stack.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-direction-20251230.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-lineskip.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-jfont-20251230.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-inputbuf.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-pretreat.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-setwidth-20251230.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-jfmglue.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-math.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-base.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-base.sty
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\ltj-kinsoku_default.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-latex.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-latex.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjfont.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjfont.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\base\tuenc.def
+INPUT C:\Program Files\MiKTeX\tex\latex\base\tuenc.def
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjdefs.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjdefs.sty
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\names\luaotfload-names.luc.gz
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman10-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman10-regular.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\jfm-ujisv.lua
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\haranoajimincho-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_haranoajimincho-regular.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\jfm-ujis.lua
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjcore.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjcore.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\l3kernel\expl3.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\l3kernel\expl3.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\l3backend\l3backend-luatex.def
+INPUT C:\Program Files\MiKTeX\tex\latex\l3backend\l3backend-luatex.def
+INPUT C:\Program Files\MiKTeX\tex\latex\l3backend\l3backend-luatex.lua
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmmono9-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmmono9-regular.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjp-atbegshi.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjp-atbegshi.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjp-geometry.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\patches\lltjp-geometry.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\ifluatex.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\ifluatex.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja-compat.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\luatexja-compat.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\luatex\luatexja\ltj-compat.lua
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\ltj-jisx0208.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman9-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman9-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman8-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman8-regular.luc
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\platex\jsclasses\jslogo.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\platex\jsclasses\jslogo.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\geometry\geometry.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\geometry\geometry.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\ifvtex.sty
+INPUT C:\Program Files\MiKTeX\tex\generic\iftex\ifvtex.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\geometry\geometry.cfg
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\geometry\geometry.cfg
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\fancyvrb\fancyvrb.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\fancyvrb\fancyvrb.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\hyperref.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\hyperref.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\kvsetkeys\kvsetkeys.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\kvsetkeys\kvsetkeys.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\kvdefinekeys\kvdefinekeys.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\kvdefinekeys\kvdefinekeys.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\pdfescape\pdfescape.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\pdfescape\pdfescape.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\hycolor\hycolor.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\hycolor\hycolor.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\nameref.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\nameref.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\refcount\refcount.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\refcount\refcount.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\gettitlestring\gettitlestring.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\gettitlestring\gettitlestring.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\kvoptions\kvoptions.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\kvoptions\kvoptions.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\stringenc\stringenc.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\stringenc\stringenc.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\pd1enc.def
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\pd1enc.def
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\intcalc\intcalc.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\intcalc\intcalc.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\puenc.def
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\puenc.def
+INPUT C:\Program Files\MiKTeX\tex\latex\url\url.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\url\url.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\bitset\bitset.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\bitset\bitset.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\bigintcalc\bigintcalc.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\bigintcalc\bigintcalc.sty
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\hluatex.def
+INPUT C:\Program Files\MiKTeX\tex\latex\hyperref\hluatex.def
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\rerunfilecheck\rerunfilecheck.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\latex\rerunfilecheck\rerunfilecheck.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\uniquecounter\uniquecounter.sty
+INPUT C:\Users\Owner\AppData\Roaming\MiKTeX\tex\generic\uniquecounter\uniquecounter.sty
+INPUT .\ehime_tour_planner_report.aux
+INPUT .\ehime_tour_planner_report.aux
+OUTPUT ehime_tour_planner_report.aux
+OUTPUT ehime_tour_planner_report.aux
+INPUT .\ehime_tour_planner_report.out
+INPUT .\ehime_tour_planner_report.out
+INPUT .\ehime_tour_planner_report.out
+INPUT .\ehime_tour_planner_report.out
+INPUT .\ehime_tour_planner_report.out
+OUTPUT ehime_tour_planner_report.out
+OUTPUT ehime_tour_planner_report.out
+OUTPUT ehime_tour_planner_report.pdf
+OUTPUT ehime_tour_planner_report.pdf
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman17-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman17-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman12-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman12-regular.luc
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr12.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr12.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmr6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi12.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi12.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmmi6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy10.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy10.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy8.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmsy6.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmex10.tfm
+INPUT C:\Program Files\MiKTeX\fonts\tfm\public\cm\cmex10.tfm
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\haranoajigothic-medium.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_haranoajigothic-medium.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmsans12-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmsans12-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmmono10-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmmono10-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman10-bold.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman10-bold.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\fonts\map\pdftex\pdftex.map
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmmonolt10-bold.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmmonolt10-bold.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman7-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman7-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmmono8-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmmono8-regular.luc
+INPUT ..\app.py
+INPUT ..\app.py
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatex-cache\generic\fonts\otl\lmroman5-regular.luc
+INPUT C:\Users\Owner\AppData\Local\MiKTeX\luatexja\extra_lmroman5-regular.luc
+INPUT ..\rag\retriever.py
+INPUT ..\rag\retriever.py
+INPUT ..\rag\retriever.py
+INPUT ..\rag\retriever.py
+INPUT ..\rag\retriever.py
+INPUT ..\rag\retriever.py
+INPUT ..\rag\prompts.py
+INPUT ..\rag\prompts.py
+INPUT ..\app.py
+INPUT ..\app.py
+INPUT ..\app.py
+INPUT ..\app.py
+INPUT .\ehime_tour_planner_report.aux
+INPUT .\ehime_tour_planner_report.aux
+INPUT .\ehime_tour_planner_report.out

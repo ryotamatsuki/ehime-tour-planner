@@ -1,0 +1,156 @@
+\documentclass[a4paper,11pt]{ltjsarticle}
+\usepackage[margin=25mm]{geometry}
+\usepackage{fancyvrb}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0.6em}
+\fvset{fontsize=\scriptsize, frame=single, numbers=left, numbersep=6pt}
+
+\title{Ehime Tour Planner アプリ紹介レポート\\\large Tavily と Gemini を用いた愛媛観光 RAG プランナー}
+\author{matsuo\_iwasawa}
+\date{2026年4月20日}
+
+\begin{document}
+\maketitle
+
+\section*{(1) アプリの概要}
+本レポートでは，愛媛県の観光情報をもとに旅行プランを自動生成するアプリ
+\texttt{Ehime Tour Planner} を紹介する。
+参考資料である \texttt{example3\_ChatGPT(LangChain).pdf} では，
+AI アプリを段階的に説明しながらコードを本文に埋め込む構成が採られていた。
+そこで本稿でも同様に，
+「入力条件の取得」「関連ページの検索」「RAG による関連情報の抽出」
+「構造化出力による旅程生成」「チャットによる再計画」
+という順に実装を紹介する。
+
+このアプリの目的は，
+愛媛旅行を計画したい利用者が，
+旅行日数，同行者，移動手段，関心テーマ，訪問エリアなどを入力するだけで，
+出典 URL つきの現実的な旅程案を得られるようにすることである。
+情報源は主に \texttt{iyokannet.jp} を対象とし，
+原文を長く転載せず，
+要約とパラフレーズを通じて旅行プランに再構成する点が特徴である。
+
+\noindent\textbf{使用技術の要点}
+\begin{itemize}
+\item UI: \texttt{Streamlit}
+\item 検索: \texttt{Tavily Search}（必要に応じて Web 全体も追加）
+\item 埋め込み: \texttt{gemini-embedding-001}
+\item 生成: \texttt{gemini-2.5-flash-lite}
+\item 検索基盤: \texttt{FAISS}，利用できない場合は NumPy のコサイン類似度で代替
+\item 出力: JSON スキーマ準拠の旅程と Markdown ダウンロード
+\end{itemize}
+
+\section*{(2) 方法}
+\subsection*{1. 入力条件を受け取る画面}
+まず，利用者が旅行条件を指定するための画面を \texttt{Streamlit} で構成する。
+旅行日数，開始日，同行者，移動手段，発着地，関心テーマ，訪問エリア，
+子連れ配慮，1 日の詰め込み度をサイドバーから入力できるようにしている。
+この段階で条件を明示的に取得しておくことで，
+後段の検索クエリと旅程生成プロンプトに同じ制約を反映できる。
+
+\noindent\textbf{コード 1: 条件入力 UI（\texttt{app.py} より）}
+\VerbatimInput[firstline=46,lastline=83,firstnumber=46]{../app.py}
+
+\subsection*{2. 関連ページの収集と前処理}
+次に，旅行計画に必要な観光情報を集める。
+このアプリでは \texttt{Tavily} を用い，
+既定では \texttt{iyokannet.jp} にドメインを限定して検索する。
+必要に応じて Web 全体の検索結果も加えられるようにしつつ，
+URL の重複は除去し，
+取得した本文は \texttt{BeautifulSoup} でテキスト化してから保持する。
+これにより，出典を保ちつつも，
+そのままの転載ではない再利用可能な検索用データを作成できる。
+
+\noindent\textbf{コード 2: 検索と前処理（\texttt{rag/retriever.py} より）}
+\VerbatimInput[firstline=38,lastline=115,firstnumber=38]{../rag/retriever.py}
+
+\subsection*{3. 埋め込みとベクトル検索による RAG}
+収集したテキストはそのまま生成器に渡さず，
+一度チャンクに分割して埋め込みベクトルへ変換する。
+本アプリでは \texttt{gemini-embedding-001} を使い，
+\texttt{FAISS} が利用可能であればそのインデックスを用い，
+利用できない環境では NumPy によるコサイン類似度計算へ切り替える。
+この実装により，
+環境差に強い RAG パイプラインを保ちながら，
+ユーザーの検索語に近い文脈だけを抽出できる。
+
+\noindent\textbf{コード 3: 埋め込みと検索基盤（\texttt{rag/retriever.py} より）}
+\VerbatimInput[firstline=117,lastline=178,firstnumber=117]{../rag/retriever.py}
+
+さらに \texttt{retrieve\_for\_plan} では，
+単に類似度の高いチャンクを並べるのではなく，
+「1 URL あたり 1 チャンク」に絞ることで情報源の偏りを抑えている。
+また，選ばれたチャンク群は Gemini に一括で要約させる。
+このまとめ要約は API 呼び出し回数の削減につながるだけでなく，
+観光記事の原文を長く引用しないという方針にも合致している。
+
+\noindent\textbf{コード 4: チャンク選択と一括要約（\texttt{rag/retriever.py} より）}
+\VerbatimInput[firstline=189,lastline=302,firstnumber=189]{../rag/retriever.py}
+
+\subsection*{4. プロンプト設計と構造化出力}
+旅程生成では，
+自由文だけを返させるのではなく，
+JSON スキーマに従った構造化出力を要求している。
+プロンプト側では，
+長い原文引用の禁止，
+各日ごとの根拠 URL の提示，
+安全面や季節性への配慮などをガードレールとして明示する。
+また，発着地や宿泊地の扱いを具体的に指定することで，
+単なる観光地の列挙ではなく，
+日程として実行しやすいプランになるよう工夫している。
+
+\noindent\textbf{コード 5: 旅程生成プロンプト（\texttt{rag/prompts.py} より）}
+\VerbatimInput[firstline=67,lastline=127,firstnumber=67]{../rag/prompts.py}
+
+実際の生成処理では，
+上記プロンプトと抽出済みコンテキストを \texttt{generate\_content} に渡し，
+\texttt{response\_json\_schema} を指定して旅程の構造を固定する。
+これにより，生成結果をそのまま画面表示や Markdown 出力へつなげやすくなる。
+
+\noindent\textbf{コード 6: 初回プラン生成（\texttt{app.py} より）}
+\VerbatimInput[firstline=123,lastline=151,firstnumber=123]{../app.py}
+
+\subsection*{5. チャットによる再計画}
+参考 PDF では，単一の処理だけでなく，
+複数段階の処理やエージェント化が順を追って説明されていた。
+本アプリでも同じ考え方で，
+初回生成のあとにチャットで修正依頼を受け取り，
+既存プランを保ちながら再構成する流れを用意している。
+利用者は「2 日目をもっとゆったりにしたい」
+「温泉を追加したい」といった自然文で修正を依頼できる。
+
+\noindent\textbf{コード 7: チャットによるプラン修正（\texttt{app.py} より）}
+\VerbatimInput[firstline=180,lastline=212,firstnumber=180]{../app.py}
+
+\section*{(3) わかったこと・今後の改善}
+このアプリを紹介する中で，次の点が重要だと分かった。
+
+\begin{itemize}
+\item 検索対象を \texttt{iyokannet.jp} 中心に絞ることで，観光プランの根拠を明確にしやすい。
+\item 生成前に関連チャンクを選別し，要点だけをまとめて渡すことで，長い観光記事をそのまま扱うよりも安定した旅程が得られる。
+\item JSON スキーマによる構造化出力は，表示，保存，再編集のすべてに有効であり，単なるテキスト生成より実用性が高い。
+\item チャットで再計画できる構成にしておくと，初回出力をたたき台として徐々に利用者の意図へ寄せられる。
+\end{itemize}
+
+一方で，今後の改善点もある。
+第一に，移動時間は現在のプロンプトと記事要約に大きく依存しているため，
+地図 API や経路探索を組み合わせれば，
+さらに現実的な時間割に近づけられる。
+第二に，検索対象が観光記事中心であるため，
+休館日や季節イベントの変化に対しては追加の最新確認が必要である。
+第三に，宿泊候補や費用見積もりを明示的に扱うと，
+より旅行計画アプリらしい完成度になると考えられる。
+
+\section*{参考資料}
+\begin{itemize}
+\item \texttt{matsuo\_iwasawa/example3\_ChatGPT(LangChain).pdf}
+\item \texttt{README.md}
+\item \texttt{app.py}
+\item \texttt{rag/retriever.py}
+\item \texttt{rag/prompts.py}
+\item \texttt{utils/formatting.py}
+\end{itemize}
+
+\end{document}
