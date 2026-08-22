@@ -1,5 +1,8 @@
+import json
 import os
+import socket
 import subprocess
+import time
 
 import modal
 
@@ -8,6 +11,7 @@ MODEL_NAME = "sbintuitions/sarashina2.2-3b-instruct-v0.1"
 SERVED_MODEL_NAME = "sarashina"
 VLLM_PORT = 8000
 MINUTES = 60
+READY_TIMEOUT = 10 * MINUTES
 
 app = modal.App("ehime-tour-planner-sarashina")
 
@@ -67,18 +71,43 @@ class Server:
             "--gpu-memory-utilization",
             "0.85",
             "--max-num-seqs",
-            "8",
+            "4",
             "--enable-prefix-caching",
             "--enforce-eager",
+            "--disable-log-requests",
             "--generation-config",
             "vllm",
         ]
         print("Starting vLLM for", MODEL_NAME)
         self.process = subprocess.Popen(cmd)
+        self._wait_until_ready()
+
+    def _wait_until_ready(self):
+        deadline = time.monotonic() + READY_TIMEOUT
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None:
+                raise RuntimeError(
+                    f"vLLM exited before becoming ready: returncode={self.process.returncode}"
+                )
+            try:
+                with socket.create_connection(("127.0.0.1", VLLM_PORT), timeout=1):
+                    print("vLLM is accepting connections")
+                    return
+            except OSError:
+                time.sleep(1)
+        raise TimeoutError(f"vLLM did not become ready within {READY_TIMEOUT} seconds")
 
     @modal.exit()
     def stop(self):
-        self.process.terminate()
+        process = getattr(self, "process", None)
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
 
 
 @app.local_entrypoint()
@@ -139,4 +168,8 @@ async def smoke_test():
         ) as response:
             response.raise_for_status()
             data = await response.json()
-            print(data["choices"][0]["message"]["content"])
+            content = data["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            if not isinstance(parsed.get("city"), str) or not parsed["city"]:
+                raise RuntimeError(f"Structured output did not contain city: {parsed!r}")
+            print(json.dumps(parsed, ensure_ascii=False))

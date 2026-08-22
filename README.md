@@ -62,7 +62,7 @@ Create `.streamlit/secrets.toml` locally (this file is gitignored):
 
 ```toml
 TAVILY_API_KEY = "tvly-..."
-SARASHINA_BASE_URL = "https://<workspace>--ehime-tour-planner-sarashina-server.modal.direct"
+SARASHINA_BASE_URL = "<exact URL printed by modal deploy>"
 SARASHINA_API_KEY = "<VLLM_API_KEY>"
 SARASHINA_MODEL = "sarashina"
 ```
@@ -94,7 +94,7 @@ Deploy:
 modal deploy modal_backend.py
 ```
 
-The deployment outputs a `modal.direct` URL. Set that URL as `SARASHINA_BASE_URL` in Streamlit Secrets and use the same `VLLM_API_KEY` as `SARASHINA_API_KEY`.
+The deployment prints the exact public URL for the server (the current Modal format is typically `modal.run`; older workspaces may show another Modal domain). Copy the URL exactly as printed into `SARASHINA_BASE_URL` in Streamlit Secrets and use the same `VLLM_API_KEY` as `SARASHINA_API_KEY`.
 
 A live smoke test can be run with:
 
