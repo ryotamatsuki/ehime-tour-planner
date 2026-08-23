@@ -209,7 +209,9 @@ class PlannerWorkflow:
                 prompt=prompt,
                 schema=ITINERARY_SCHEMA,
                 schema_name="itinerary",
-                max_tokens=2400,
+                # vLLMの8192上限に対し、RAGコンテキストが最大5793 tokens
+                # になるため、入力+出力が必ず上限内に収まるようにする。
+                max_tokens=2000,
             )
             plan = Itinerary.model_validate(raw).model_dump()
         else:
@@ -321,7 +323,7 @@ class PlannerWorkflow:
             prompt=prompt,
             schema=ITINERARY_SCHEMA,
             schema_name="itinerary_repair",
-            max_tokens=2400,
+            max_tokens=2000,
         )
         plan = Itinerary.model_validate(raw).model_dump()
         allowed = {s["url"] for s in state["sources"]}
