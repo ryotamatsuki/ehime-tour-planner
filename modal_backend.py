@@ -74,7 +74,6 @@ class Server:
             "4",
             "--enable-prefix-caching",
             "--enforce-eager",
-            "--disable-log-requests",
             "--generation-config",
             "vllm",
         ]
