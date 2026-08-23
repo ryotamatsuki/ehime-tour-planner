@@ -18,4 +18,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements-test.txt
       - run: python -m compileall app.py rag workflow llm
+      - name: Runtime import smoke
+        run: |
+          python -c "from workflow.fast_planner import FastPlannerWorkflow; from rag.fast_retriever import CachedSpotRetriever; print('runtime imports ok')"
       - run: python -m pytest -q
