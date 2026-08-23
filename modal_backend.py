@@ -35,12 +35,19 @@ vllm_image = (
 )
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.lower() in {"1", "true", "yes", "on"}
+
+
 @app.server(
     image=vllm_image,
     gpu="T4",
-    # Long structured-output requests can exceed one minute on a T4. Keep
-    # the container available while a request or retry is still in flight.
-    scaledown_window=600,
+    # This PoC intentionally scales to zero. Keep a recently-used T4 warm for
+    # Modal's maximum 20-minute window, but do not pay for min_containers=1.
+    scaledown_window=20 * MINUTES,
     startup_timeout=10 * MINUTES,
     volumes={
         "/root/.cache/huggingface": hf_cache,
@@ -48,8 +55,6 @@ vllm_image = (
     },
     secrets=[modal.Secret.from_name("ehime-tour-planner-vllm")],
     port=VLLM_PORT,
-    # Keep one active decode per T4 for stability. CUDA graph mode improves
-    # warm single-request throughput without reintroducing decode contention.
     target_concurrency=1,
     max_containers=1,
     unauthenticated=True,
@@ -57,13 +62,20 @@ vllm_image = (
 class Server:
     @modal.enter()
     def start(self):
+        startup_started = time.monotonic()
         api_key = os.environ["VLLM_API_KEY"]
-        enforce_eager = os.getenv("VLLM_ENFORCE_EAGER", "0").lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+
+        # Modal's current vLLM guidance recommends eager mode for services that
+        # frequently scale from zero: it skips Torch/CUDA-graph compilation at
+        # boot. PR #16 reduced warm generation to ~16 s, leaving enough headroom
+        # to trade some decode throughput for a much shorter cold start.
+        fast_boot = _env_flag("VLLM_FAST_BOOT", True)
+        if os.getenv("VLLM_ENFORCE_EAGER") is not None:
+            # Explicit emergency override takes precedence over FAST_BOOT.
+            enforce_eager = _env_flag("VLLM_ENFORCE_EAGER", fast_boot)
+        else:
+            enforce_eager = fast_boot
+
         cmd = [
             "vllm",
             "serve",
@@ -89,18 +101,24 @@ class Server:
             "vllm",
         ]
         if enforce_eager:
-            # Emergency compatibility switch. Default is CUDA graph mode for
-            # faster warm inference; set the Modal secret env var to 1 to
-            # revert without another code change.
             cmd.append("--enforce-eager")
+        else:
+            cmd.append("--no-enforce-eager")
+
         print(
             "Starting vLLM for",
             MODEL_NAME,
             "mode=",
-            "eager" if enforce_eager else "cuda_graph",
+            "fast_boot_eager" if enforce_eager else "cuda_graph",
         )
         self.process = subprocess.Popen(cmd)
         self._wait_until_ready()
+        print(
+            "vllm_startup_seconds=",
+            round(time.monotonic() - startup_started, 2),
+            "fast_boot=",
+            fast_boot,
+        )
 
     def _wait_until_ready(self):
         deadline = time.monotonic() + READY_TIMEOUT
