@@ -1,8 +1,9 @@
 import json
 import os
-import socket
 import subprocess
 import time
+import urllib.error
+import urllib.request
 
 import modal
 
@@ -89,10 +90,13 @@ class Server:
                     f"vLLM exited before becoming ready: returncode={self.process.returncode}"
                 )
             try:
-                with socket.create_connection(("127.0.0.1", VLLM_PORT), timeout=1):
-                    print("vLLM is accepting connections")
-                    return
-            except OSError:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{VLLM_PORT}/health", timeout=2
+                ) as response:
+                    if response.status == 200:
+                        print("vLLM health check passed")
+                        return
+            except (OSError, urllib.error.URLError):
                 time.sleep(1)
         raise TimeoutError(f"vLLM did not become ready within {READY_TIMEOUT} seconds")
 
