@@ -4,6 +4,7 @@ from workflow.planner import (
     itinerary_schema_for_days,
     needs_fresh_search,
     semantic_violations,
+    trim_extra_days,
 )
 
 
@@ -107,3 +108,9 @@ def test_itinerary_schema_limits_requested_day_count():
     schema = itinerary_schema_for_days(1)
     assert schema["properties"]["days"]["minItems"] == 1
     assert schema["properties"]["days"]["maxItems"] == 1
+
+
+
+def test_trim_extra_days_keeps_requested_days():
+    plan = _plan()
+    assert [d["day"] for d in trim_extra_days(plan, 1)["days"]] == [1]
