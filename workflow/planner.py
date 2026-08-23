@@ -122,6 +122,12 @@ def apply_patch(plan: dict[str, Any], patch: PlanPatch) -> dict[str, Any]:
     updated["days"] = [day_map[k] for k in sorted(day_map)]
     return updated
 
+def itinerary_schema_for_days(expected_days: int) -> dict[str, Any]:
+    schema = deepcopy(ITINERARY_SCHEMA)
+    schema["properties"]["days"]["minItems"] = expected_days
+    schema["properties"]["days"]["maxItems"] = expected_days
+    return schema
+
 
 class PlannerWorkflow:
     def __init__(self, retriever: EhimeRetriever, llm: SarashinaClient):
@@ -207,7 +213,7 @@ class PlannerWorkflow:
             )
             raw = self.llm.generate_json(
                 prompt=prompt,
-                schema=ITINERARY_SCHEMA,
+                schema=itinerary_schema_for_days(trip_days),
                 schema_name="itinerary",
                 # vLLMの8192上限に対し、RAGコンテキストが最大5793 tokens
                 # になるため、入力+出力が必ず上限内に収まるようにする。
@@ -321,7 +327,7 @@ class PlannerWorkflow:
         )
         raw = self.llm.generate_json(
             prompt=prompt,
-            schema=ITINERARY_SCHEMA,
+            schema=itinerary_schema_for_days(state["trip_days"]),
             schema_name="itinerary_repair",
             max_tokens=2000,
         )
