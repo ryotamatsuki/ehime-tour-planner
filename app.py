@@ -7,6 +7,10 @@ import streamlit as st
 from llm.sarashina_client import SarashinaClient
 from rag.fast_retriever import CachedSpotRetriever
 from utils.formatting import plan_json_to_markdown
+from utils.runtime_metrics import (
+    ensure_workflow_metrics_compatibility,
+    snapshot_workflow_metrics,
+)
 from workflow.fast_planner import FastPlannerWorkflow
 
 
@@ -31,9 +35,9 @@ SARASHINA_API_KEY = st.secrets.get(
 SARASHINA_MODEL = st.secrets.get(
     "SARASHINA_MODEL", os.getenv("SARASHINA_MODEL", "sarashina")
 )
-# Bump when workflow/retry behavior changes so Streamlit cannot reuse an old
-# cached workflow instance after deploy.
-SARASHINA_CLIENT_CONFIG_VERSION = "spot-id-cache-v1"
+# Bump when workflow/retry/telemetry compatibility changes so Streamlit cannot
+# reuse a cached workflow containing an older SarashinaClient instance.
+SARASHINA_CLIENT_CONFIG_VERSION = "spot-id-cache-v2-metrics-compat"
 
 missing = []
 if not TAVILY_API_KEY:
@@ -79,6 +83,9 @@ workflow = get_workflow(
     SARASHINA_MODEL,
     SARASHINA_CLIENT_CONFIG_VERSION,
 )
+# A successful itinerary must never be turned into a failure only because an
+# older cached object does not yet expose telemetry fields.
+ensure_workflow_metrics_compatibility(workflow)
 
 if "items" not in st.session_state:
     st.session_state.items = []
@@ -91,12 +98,7 @@ if "last_metrics" not in st.session_state:
 
 
 def snapshot_metrics(final_state: dict) -> dict:
-    return {
-        "strategy": final_state.get("generation_strategy", "unknown"),
-        "planner": dict(final_state.get("timings", {})),
-        "retrieval": dict(getattr(workflow.retriever, "last_metrics", {})),
-        "llm": dict(workflow.llm.last_request_metrics),
-    }
+    return snapshot_workflow_metrics(workflow, final_state)
 
 
 def seconds_label(value) -> str:
@@ -325,6 +327,11 @@ if st.session_state.plan_json:
                     f"{llm_metrics.get('completion_tokens', '—')}"
                 ),
             )
+            if not llm_metrics:
+                st.caption(
+                    "LLM詳細計測は旧キャッシュ互換モードのため未取得です。"
+                    "次回生成から新しいSarashinaClientの計測値を表示します。"
+                )
             st.caption(
                 "cache HIT時は同じ取得文書のdense embeddingを再計算せず、"
                 "query embeddingだけを更新します。"
