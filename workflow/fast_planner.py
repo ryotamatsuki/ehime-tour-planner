@@ -88,13 +88,33 @@ def normalize_compact_bundle(raw: Any) -> Any:
     return cleaned
 
 
+def _facility_keys(candidates: list[dict[str, Any]]) -> list[str]:
+    generic_keys = {"愛媛", "松山", "観光", "温泉", "グルメ", "歴史"}
+    keys = {
+        str(candidate.get("canonical_key") or "").strip()
+        for candidate in candidates
+    }
+    return sorted(
+        (key for key in keys if 3 <= len(key) <= 12 and key not in generic_keys),
+        key=len,
+        reverse=True,
+    )
+
+
+def _mentioned_facilities(text: Any, facility_keys: list[str]) -> set[str]:
+    normalized = re.sub(r"\\s+", "", str(text or "")).lower()
+    return {key for key in facility_keys if key and key in normalized}
+
+
 def hydrate_spot_bundle(
     bundle: CompactDayBundle,
     candidates: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Restore deterministic display/source fields from selected spot IDs."""
     by_id = {candidate["spot_id"]: candidate for candidate in candidates}
+    facility_keys = _facility_keys(candidates)
     used_ids: list[str] = []
+    used_facilities: set[str] = set()
     days: list[dict[str, Any]] = []
 
     for compact_day in bundle.days:
@@ -104,6 +124,19 @@ def hydrate_spot_bundle(
             candidate = by_id.get(choice.spot_id)
             if candidate is None:
                 raise ValueError(f"未知のspot_idです: {choice.spot_id}")
+
+            candidate_text = " ".join(
+                [
+                    str(candidate.get("title", "")),
+                    str(candidate.get("excerpt", "")),
+                    choice.activity,
+                    choice.tip,
+                ]
+            )
+            mentioned = _mentioned_facilities(candidate_text, facility_keys)
+            if choice.spot_id in used_ids or mentioned & used_facilities:
+                continue
+
             url = str(candidate["url"])
             title = str(candidate["title"]).strip() or choice.spot_id
             schedule.append(
@@ -120,6 +153,55 @@ def hydrate_spot_bundle(
                 source_urls.append(url)
             if choice.spot_id not in used_ids:
                 used_ids.append(choice.spot_id)
+            used_facilities.update(mentioned)
+
+        if not schedule:
+            fallback = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate["spot_id"] not in used_ids
+                    and not (
+                        _mentioned_facilities(
+                            " ".join(
+                                [
+                                    str(candidate.get("title", "")),
+                                    str(candidate.get("excerpt", "")),
+                                ]
+                            ),
+                            facility_keys,
+                        )
+                        & used_facilities
+                    )
+                ),
+                None,
+            )
+            if fallback is not None:
+                fallback_id = str(fallback["spot_id"])
+                fallback_url = str(fallback["url"])
+                schedule.append(
+                    {
+                        "time": "09:00-10:00",
+                        "activity": "候補スポットを訪問",
+                        "spot": str(fallback["title"]).strip() or fallback_id,
+                        "address": "",
+                        "url": fallback_url,
+                        "tip": "",
+                    }
+                )
+                source_urls.append(fallback_url)
+                used_ids.append(fallback_id)
+                used_facilities.update(
+                    _mentioned_facilities(
+                        " ".join(
+                            [
+                                str(fallback.get("title", "")),
+                                str(fallback.get("excerpt", "")),
+                            ]
+                        ),
+                        facility_keys,
+                    )
+                )
 
         days.append(
             {
