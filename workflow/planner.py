@@ -128,6 +128,12 @@ def itinerary_schema_for_days(expected_days: int) -> dict[str, Any]:
     schema["properties"]["days"]["maxItems"] = expected_days
     return schema
 
+def trim_extra_days(plan: dict[str, Any], expected_days: int) -> dict[str, Any]:
+    cleaned = deepcopy(plan)
+    days = [d for d in cleaned.get("days", []) if d.get("day", 0) <= expected_days]
+    cleaned["days"] = sorted(days, key=lambda d: d.get("day", 0))[:expected_days]
+    return cleaned
+
 
 class PlannerWorkflow:
     def __init__(self, retriever: EhimeRetriever, llm: SarashinaClient):
@@ -219,7 +225,9 @@ class PlannerWorkflow:
                 # になるため、入力+出力が必ず上限内に収まるようにする。
                 max_tokens=2000,
             )
-            plan = Itinerary.model_validate(raw).model_dump()
+            plan = trim_extra_days(
+                Itinerary.model_validate(raw).model_dump(), trip_days
+            )
         else:
             plan = self._generate_segmented(state)
 
@@ -331,7 +339,9 @@ class PlannerWorkflow:
             schema_name="itinerary_repair",
             max_tokens=2000,
         )
-        plan = Itinerary.model_validate(raw).model_dump()
+        plan = trim_extra_days(
+            Itinerary.model_validate(raw).model_dump(), state["trip_days"]
+        )
         allowed = {s["url"] for s in state["sources"]}
         plan = sanitize_urls(plan, allowed)
         plan["sources"] = [SourceItem(**s).model_dump() for s in state["sources"]]
