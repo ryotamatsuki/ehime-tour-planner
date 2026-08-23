@@ -1,12 +1,11 @@
 from __future__ import annotations
-import textwrap
+
 
 def plan_json_to_markdown(plan: dict) -> str:
     lines = []
     title = plan.get("title", "愛媛 旅程プラン")
     summary = plan.get("summary", "")
 
-    # Use smaller headings for a cleaner look
     lines.append(f"### {title}")
     if summary:
         lines.append(f"*{summary}*")
@@ -15,51 +14,45 @@ def plan_json_to_markdown(plan: dict) -> str:
     for day in plan.get("days", []):
         d = day.get("day")
         theme = day.get("theme", "")
-        area = day.get("area", "")
-        
-        # Use a smaller heading for the day's theme
-        lines.append(f"#### Day {d}: {theme} ({area})")
-        
-        for s in day.get("schedule", []):
-            time = s.get("time", "")
-            spot = s.get("spot", "")
-            act = s.get("activity", "")
-            tip = s.get("tip", "")
-            url = s.get("url", "")
-            addr = s.get("address", "")
-            
-            # De-emphasize time, emphasize the spot, use a colon
-            line = f"- {time} **{spot}**: {act}"
-            
+        area = str(day.get("area", "") or "").strip()
+        area_suffix = f" ({area})" if area else ""
+        lines.append(f"#### Day {d}: {theme}{area_suffix}")
+
+        for schedule in day.get("schedule", []):
+            time = schedule.get("time", "")
+            spot = schedule.get("spot", "")
+            activity = schedule.get("activity", "")
+            tip = schedule.get("tip", "")
+            url = schedule.get("url", "")
+            address = schedule.get("address", "")
+
+            line = f"- {time} **{spot}**: {activity}"
             details = []
-            if addr:
-                details.append(f"住所: {addr}")
+            if address:
+                details.append(f"住所: {address}")
             if url:
                 details.append(f"[公式情報]({url})")
-
-            # Combine address and URL if both exist
             if details:
                 line += f" ({'｜'.join(details)})"
-            
             lines.append(line)
 
-            # Indent tip and make it italic for a softer look
             if tip:
                 lines.append(f"  - *メモ: {tip}*")
-        
-        lines.append("") # Add space after each day's schedule
-        
-        srcs = day.get("source_urls", [])
-        if srcs:
+
+        lines.append("")
+        source_urls = day.get("source_urls", [])
+        if source_urls:
             lines.append("**根拠URL**:")
-            for u in srcs:
-                lines.append(f"- {u}")
+            for url in source_urls:
+                lines.append(f"- {url}")
         lines.append("")
 
     if plan.get("sources"):
         lines.append("---")
         lines.append("## 参考ソース")
-        for s in plan["sources"]:
-            lines.append(f"- [{s['title']}]({s['url']}) — {s.get('site','')}")
-            
+        for source in plan["sources"]:
+            lines.append(
+                f"- [{source['title']}]({source['url']}) — {source.get('site', '')}"
+            )
+
     return "\n".join(lines)
