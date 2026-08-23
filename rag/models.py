@@ -28,7 +28,9 @@ class DayPlan(StrictModel):
     day: int = Field(ge=1)
     theme: str
     area: str = ""
-    schedule: list[ScheduleItem]
+    # 8,192-token contextで小型モデルのJSONが途中切れしないよう、
+    # 1日あたりの候補数をSchemaでも上限固定する。
+    schedule: list[ScheduleItem] = Field(min_length=1, max_length=2)
     notes: str = ""
     source_urls: list[str] = Field(default_factory=list)
 
