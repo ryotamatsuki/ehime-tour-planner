@@ -1,18 +1,55 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from rag.models import SourceItem
 from rag.retriever import RetrievalItem
 from rag.spot_models import CompactDayBundle, compact_day_bundle_schema
 from rag.spot_prompts import build_spot_plan_prompt, build_spot_segment_prompt
-from workflow.planner import (
-    SEGMENT_DAYS,
-    PlannerState,
-    PlannerWorkflow,
-    _timings_with,
-    should_generate_single_pass,
-)
+from workflow.planner import PlannerState, PlannerWorkflow
+
+
+# Keep the fast planner self-contained at import time. Streamlit can hot-reload
+# this module while workflow.planner is still the older in-memory module from a
+# previous deploy, so importing helpers/constants newly added to planner creates
+# a brittle runtime import contract even when the repository contents match.
+MODEL_CONTEXT_TOKENS = 8192
+SINGLE_PASS_MAX_DAYS = 4
+SINGLE_PASS_SAFETY_TOKENS = 700
+STRUCTURED_OUTPUT_OVERHEAD_TOKENS = 400
+SEGMENT_DAYS = 3
+
+
+def _timings_with(
+    state: PlannerState, key: str, started: float
+) -> dict[str, float]:
+    timings = dict(state.get("timings", {}))
+    timings[key] = round((time.perf_counter() - started) * 1000, 1)
+    return timings
+
+
+def _estimate_prompt_tokens(text: str) -> int:
+    ascii_chars = sum(1 for char in text if ord(char) < 128)
+    non_ascii_chars = len(text) - ascii_chars
+    return non_ascii_chars + (ascii_chars + 3) // 4
+
+
+def _should_generate_single_pass(trip_days: int, prompt: str) -> bool:
+    if trip_days <= 3:
+        return True
+    if trip_days > SINGLE_PASS_MAX_DAYS:
+        return False
+    # Preserve PR #15's conservative decision rule so this hotfix changes only
+    # the import contract, not the one-pass safety margin.
+    legacy_output_budget = 500 + 280 * trip_days
+    estimated_total = (
+        _estimate_prompt_tokens(prompt)
+        + STRUCTURED_OUTPUT_OVERHEAD_TOKENS
+        + legacy_output_budget
+        + SINGLE_PASS_SAFETY_TOKENS
+    )
+    return estimated_total <= MODEL_CONTEXT_TOKENS
 
 
 def compact_output_budget(days: int) -> int:
@@ -81,8 +118,6 @@ class FastPlannerWorkflow(PlannerWorkflow):
         if state["mode"] == "refine":
             return super()._retrieve(state)
 
-        import time
-
         started = time.perf_counter()
         items = [RetrievalItem(**item) for item in state.get("items", [])]
         candidate_limit = min(10, max(6, state["trip_days"] * 2))
@@ -121,7 +156,7 @@ class FastPlannerWorkflow(PlannerWorkflow):
             candidate_context=state["context"],
         )
 
-        if should_generate_single_pass(trip_days, prompt):
+        if _should_generate_single_pass(trip_days, prompt):
             raw = self.llm.generate_json(
                 prompt=prompt,
                 schema=compact_day_bundle_schema(
