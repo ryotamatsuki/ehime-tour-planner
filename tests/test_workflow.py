@@ -1,6 +1,7 @@
 from rag.models import DayPlan, PlanPatch, ScheduleItem
 from workflow.planner import (
     apply_patch,
+    day_bundle_schema_for_days,
     itinerary_schema_for_days,
     needs_fresh_search,
     semantic_violations,
@@ -98,10 +99,8 @@ def test_patch_replaces_only_target_day():
     assert updated["days"][1]["theme"] == "ゆったり道後"
 
 
-
 def test_day_schema_limits_schedule_size():
     assert DayPlan.model_json_schema()["properties"]["schedule"]["maxItems"] == 2
-
 
 
 def test_itinerary_schema_limits_requested_day_count():
@@ -109,6 +108,11 @@ def test_itinerary_schema_limits_requested_day_count():
     assert schema["properties"]["days"]["minItems"] == 1
     assert schema["properties"]["days"]["maxItems"] == 1
 
+
+def test_day_bundle_schema_limits_requested_day_count():
+    schema = day_bundle_schema_for_days(2)
+    assert schema["properties"]["days"]["minItems"] == 2
+    assert schema["properties"]["days"]["maxItems"] == 2
 
 
 def test_trim_extra_days_keeps_requested_days():
