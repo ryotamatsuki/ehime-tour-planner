@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+import unicodedata
 from collections import OrderedDict
 from dataclasses import dataclass
 
@@ -17,6 +18,29 @@ class _CorpusIndex:
     chunks: list
     bm25_tokens: list[list[str]]
     doc_vecs: np.ndarray
+
+
+def canonical_spot_key(title: str) -> str:
+    """Normalize search-result titles so duplicate facility pages collapse.
+
+    Tavily can return multiple iyokannet pages for one physical place, e.g.
+    "松山城観光" and "松山城 - 愛媛県". URL-only dedupe cannot catch this,
+    so remove common portal/suffix noise before candidate IDs are assigned.
+    """
+    text = unicodedata.normalize("NFKC", str(title or "")).lower().strip()
+    text = re.sub(r"【[^】]*】|\[[^\]]*\]|（[^）]*）|\([^)]*\)", "", text)
+    # Portal/site suffixes usually follow a separator; keep only the facility side.
+    text = re.split(r"\s+(?:[-–—|｜])\s+", text, maxsplit=1)[0]
+    for noise in (
+        "愛媛県公式観光サイト",
+        "愛媛県観光サイト",
+        "いよ観ネット",
+        "公式ホームページ",
+        "公式サイト",
+    ):
+        text = text.replace(noise, "")
+    text = re.sub(r"(?:観光案内|観光情報|観光|愛媛県)$", "", text)
+    return re.sub(r"[^0-9a-z\u3040-\u30ff\u3400-\u9fff]+", "", text)
 
 
 class CachedSpotRetriever(EhimeRetriever):
@@ -183,7 +207,7 @@ class CachedSpotRetriever(EhimeRetriever):
         user_query: str,
         candidate_limit: int = 8,
     ) -> tuple[list[str], list[dict]]:
-        """Return compact, ID-addressable candidates for itinerary generation."""
+        """Return compact, ID-addressable, facility-deduplicated candidates."""
         total_started = time.perf_counter()
         index, cache_hit, doc_embedding_ms = self._get_or_build_index(items)
         if not index.chunks:
@@ -200,13 +224,21 @@ class CachedSpotRetriever(EhimeRetriever):
         ranked, query_embedding_ms = self._rank(index, user_query)
         candidates: list[dict] = []
         seen_urls: set[str] = set()
+        seen_spot_keys: set[str] = set()
         for idx in ranked:
             chunk = index.chunks[idx]
             if chunk.url in seen_urls:
                 continue
             if not re.match(r"^https?://", chunk.url) or "${" in chunk.url:
                 continue
+
+            spot_key = canonical_spot_key(chunk.title)
+            if spot_key and spot_key in seen_spot_keys:
+                continue
+
             seen_urls.add(chunk.url)
+            if spot_key:
+                seen_spot_keys.add(spot_key)
             excerpt = re.sub(r"\s+", " ", chunk.text).strip()[:420]
             candidates.append(
                 {
@@ -215,6 +247,7 @@ class CachedSpotRetriever(EhimeRetriever):
                     "url": chunk.url,
                     "site": chunk.site,
                     "excerpt": excerpt,
+                    "canonical_key": spot_key,
                 }
             )
             if len(candidates) >= max(1, candidate_limit):

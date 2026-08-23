@@ -67,10 +67,14 @@ def test_snapshot_preserves_new_client_metrics():
     assert metrics["retrieval"]["cache_hit"] is True
 
 
-def test_streamlit_entrypoint_busts_cache_and_uses_safe_snapshot():
+def test_streamlit_entrypoint_busts_versioned_resources_and_uses_safe_snapshot():
     source = Path("app.py").read_text(encoding="utf-8")
 
-    assert 'SARASHINA_CLIENT_CONFIG_VERSION = "spot-id-cache-v2-metrics-compat"' in source
+    assert 'WORKFLOW_CONFIG_VERSION = "spot-id-cache-v3-quality"' in source
+    assert 'RETRIEVER_CONFIG_VERSION = "canonical-spot-dedupe-v1"' in source
+    assert "get_retriever(TAVILY_API_KEY, RETRIEVER_CONFIG_VERSION)" in source
+    assert "WORKFLOW_CONFIG_VERSION," in source
+    assert "RETRIEVER_CONFIG_VERSION," in source
     assert "ensure_workflow_metrics_compatibility(workflow)" in source
     assert "snapshot_workflow_metrics(workflow, final_state)" in source
     assert "dict(workflow.llm.last_request_metrics)" not in source

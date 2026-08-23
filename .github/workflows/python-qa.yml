@@ -17,7 +17,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements-test.txt
-      - run: python -m compileall app.py rag workflow llm
+      - run: python -m compileall app.py modal_backend.py rag workflow llm utils
       - name: Runtime import smoke
         run: |
           python -c "from workflow.fast_planner import FastPlannerWorkflow; from rag.fast_retriever import CachedSpotRetriever; print('runtime imports ok')"

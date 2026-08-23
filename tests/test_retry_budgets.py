@@ -61,6 +61,36 @@ def test_warm_request_uses_short_retry_budget():
     assert post.call_count == 3
 
 
+def test_cold_start_uses_constant_poll_interval_and_records_wait():
+    responses = [
+        FakeResponse(503, {}),
+        FakeResponse(503, {}),
+        FakeResponse(200, _payload(with_usage=True)),
+    ]
+    client = SarashinaClient(
+        base_url="https://example.modal.direct",
+        api_key="test-key",
+        cold_start_retries=5,
+        cold_start_poll_seconds=2.0,
+    )
+
+    with (
+        patch("llm.sarashina_client.requests.post", side_effect=responses) as post,
+        patch("llm.sarashina_client.time.sleep") as sleep,
+    ):
+        client.generate_json(
+            prompt="cold",
+            schema={"type": "object"},
+            schema_name="cold",
+        )
+
+    assert post.call_count == 3
+    assert [call.args[0] for call in sleep.call_args_list] == [2.0, 2.0]
+    assert client.last_request_metrics["phase"] == "cold_start"
+    assert client.last_request_metrics["retries"] == 2
+    assert client.last_request_metrics["retry_wait_ms"] == 4000.0
+
+
 def test_request_metrics_capture_usage():
     client = SarashinaClient(
         base_url="https://example.modal.direct",
@@ -79,5 +109,6 @@ def test_request_metrics_capture_usage():
 
     assert client.last_request_metrics["phase"] == "cold_start"
     assert client.last_request_metrics["attempts"] == 1
+    assert client.last_request_metrics["retry_wait_ms"] == 0.0
     assert client.last_request_metrics["prompt_tokens"] == 100
     assert client.last_request_metrics["completion_tokens"] == 12
