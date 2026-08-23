@@ -71,3 +71,38 @@ def test_raises_after_retry_budget_is_exhausted():
                 raise AssertionError("503 should be raised after retries are exhausted")
 
     assert post.call_count == 2
+
+
+def test_parses_json_code_fence_and_surrounding_text():
+    data = {
+        "choices": [
+            {
+                "message": {
+                    "content": '説明です。\n\x60\x60\x60json\n{"city":"松山"}\n\x60\x60\x60'
+                }
+            }
+        ]
+    }
+    assert SarashinaClient._decode_json_content(data) == {"city": "松山"}
+
+
+def test_retries_once_when_json_is_truncated():
+    responses = [
+        FakeResponse(200, {"choices": [{"message": {"content": '{"city":'}}]}),
+        FakeResponse(200, _payload()),
+    ]
+    client = SarashinaClient(
+        base_url="https://example.modal.direct",
+        api_key="test-key",
+        max_retries=0,
+    )
+
+    with patch("llm.sarashina_client.requests.post", side_effect=responses) as post:
+        result = client.generate_json(
+            prompt="test",
+            schema={"type": "object"},
+            schema_name="test",
+        )
+
+    assert result == {"city": "松山"}
+    assert post.call_count == 2
