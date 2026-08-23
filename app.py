@@ -31,6 +31,9 @@ SARASHINA_API_KEY = st.secrets.get(
 SARASHINA_MODEL = st.secrets.get(
     "SARASHINA_MODEL", os.getenv("SARASHINA_MODEL", "sarashina")
 )
+# Bump this when the client retry behavior changes so Streamlit does not reuse
+# a cached workflow containing an older SarashinaClient instance.
+SARASHINA_CLIENT_CONFIG_VERSION = "modal-cold-start-retry-v2"
 
 missing = []
 if not TAVILY_API_KEY:
@@ -56,7 +59,9 @@ def get_workflow(
     sarashina_base_url: str,
     sarashina_api_key: str,
     sarashina_model: str,
+    client_config_version: str,
 ) -> PlannerWorkflow:
+    del client_config_version
     retriever = get_retriever(tavily_key)
     llm = SarashinaClient(
         base_url=sarashina_base_url,
@@ -72,6 +77,7 @@ workflow = get_workflow(
     SARASHINA_BASE_URL,
     SARASHINA_API_KEY,
     SARASHINA_MODEL,
+    SARASHINA_CLIENT_CONFIG_VERSION,
 )
 
 if "items" not in st.session_state:
