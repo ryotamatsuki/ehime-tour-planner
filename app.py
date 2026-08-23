@@ -39,7 +39,7 @@ SARASHINA_MODEL = st.secrets.get(
 # pre-release workflow/retriever objects after code-only deployments.
 WORKFLOW_CONFIG_VERSION = "spot-id-cache-v3-quality"
 RETRIEVER_CONFIG_VERSION = "canonical-spot-dedupe-v1"
-RESOURCE_CACHE_EPOCH = "pr20-quality-runtime-reverify-1"
+RESOURCE_CACHE_EPOCH = "pr22-facility-dedupe-reverify-1"
 
 missing = []
 if not TAVILY_API_KEY:
