@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -8,6 +9,7 @@ import requests
 
 
 RETRYABLE_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
+LOGGER = logging.getLogger(__name__)
 
 
 class SarashinaClient:
@@ -18,15 +20,25 @@ class SarashinaClient:
         api_key: str,
         model: str = "sarashina",
         timeout: int = 300,
-        max_retries: int = 24,
+        max_retries: int | None = None,
+        cold_start_retries: int = 24,
+        generation_retries: int = 2,
         retry_backoff_seconds: float = 3.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
-        self.max_retries = max(0, max_retries)
+        if max_retries is not None:
+            # Backward-compatible override used by tests and callers that want
+            # one retry budget for both phases.
+            cold_start_retries = max_retries
+            generation_retries = max_retries
+        self.cold_start_retries = max(0, cold_start_retries)
+        self.generation_retries = max(0, generation_retries)
         self.retry_backoff_seconds = max(0.0, retry_backoff_seconds)
+        self._ready_seen = False
+        self.last_request_metrics: dict[str, Any] = {}
 
     def generate_json(
         self,
@@ -84,30 +96,85 @@ class SarashinaClient:
             "json": payload,
             "timeout": self.timeout,
         }
+        retry_budget = (
+            self.generation_retries if self._ready_seen else self.cold_start_retries
+        )
+        phase = "warm" if self._ready_seen else "cold_start"
+        started = time.perf_counter()
         response = None
-        for attempt in range(self.max_retries + 1):
+        attempts = 0
+
+        for attempt in range(retry_budget + 1):
+            attempts = attempt + 1
             try:
                 response = requests.post(
                     f"{self.base_url}/v1/chat/completions", **request_kwargs
                 )
             except requests.RequestException:
-                if attempt >= self.max_retries:
+                if attempt >= retry_budget:
+                    self._record_metrics(
+                        started=started,
+                        phase=phase,
+                        attempts=attempts,
+                        status_code=None,
+                        usage=None,
+                    )
                     raise
                 self._sleep_before_retry(attempt)
                 continue
 
-            if (
-                response.status_code not in RETRYABLE_STATUS_CODES
-                or attempt >= self.max_retries
-            ):
-                response.raise_for_status()
-                break
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < retry_budget:
+                self._sleep_before_retry(attempt)
+                continue
 
-            self._sleep_before_retry(attempt)
+            if response.status_code >= 400:
+                self._record_metrics(
+                    started=started,
+                    phase=phase,
+                    attempts=attempts,
+                    status_code=response.status_code,
+                    usage=None,
+                )
+                response.raise_for_status()
+            break
 
         if response is None:
             raise RuntimeError("Sarashina APIへの接続に失敗しました。")
-        return response.json()
+
+        data = response.json()
+        self._ready_seen = True
+        self._record_metrics(
+            started=started,
+            phase=phase,
+            attempts=attempts,
+            status_code=response.status_code,
+            usage=data.get("usage") if isinstance(data, dict) else None,
+        )
+        return data
+
+    def _record_metrics(
+        self,
+        *,
+        started: float,
+        phase: str,
+        attempts: int,
+        status_code: int | None,
+        usage: Any,
+    ) -> None:
+        metrics: dict[str, Any] = {
+            "phase": phase,
+            "attempts": attempts,
+            "retries": max(0, attempts - 1),
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "status_code": status_code,
+        }
+        if isinstance(usage, dict):
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                value = usage.get(key)
+                if isinstance(value, int):
+                    metrics[key] = value
+        self.last_request_metrics = metrics
+        LOGGER.info("sarashina_request_metrics=%s", metrics)
 
     @staticmethod
     def _decode_json_content(data: dict[str, Any]) -> dict[str, Any]:

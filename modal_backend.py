@@ -48,7 +48,8 @@ vllm_image = (
     },
     secrets=[modal.Secret.from_name("ehime-tour-planner-vllm")],
     port=VLLM_PORT,
-    # Avoid competing long decodes on one T4 when a browser submits twice.
+    # Keep one active decode per T4 for stability. CUDA graph mode improves
+    # warm single-request throughput without reintroducing decode contention.
     target_concurrency=1,
     max_containers=1,
     unauthenticated=True,
@@ -57,6 +58,12 @@ class Server:
     @modal.enter()
     def start(self):
         api_key = os.environ["VLLM_API_KEY"]
+        enforce_eager = os.getenv("VLLM_ENFORCE_EAGER", "0").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         cmd = [
             "vllm",
             "serve",
@@ -78,11 +85,20 @@ class Server:
             "--max-num-seqs",
             "1",
             "--enable-prefix-caching",
-            "--enforce-eager",
             "--generation-config",
             "vllm",
         ]
-        print("Starting vLLM for", MODEL_NAME)
+        if enforce_eager:
+            # Emergency compatibility switch. Default is CUDA graph mode for
+            # faster warm inference; set the Modal secret env var to 1 to
+            # revert without another code change.
+            cmd.append("--enforce-eager")
+        print(
+            "Starting vLLM for",
+            MODEL_NAME,
+            "mode=",
+            "eager" if enforce_eager else "cuda_graph",
+        )
         self.process = subprocess.Popen(cmd)
         self._wait_until_ready()
 

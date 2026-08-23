@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from copy import deepcopy
 from typing import Any, Literal, TypedDict
 
@@ -24,6 +26,13 @@ from rag.prompts import (
 )
 from rag.retriever import EhimeRetriever, RetrievalItem
 
+
+LOGGER = logging.getLogger(__name__)
+MODEL_CONTEXT_TOKENS = 8192
+SINGLE_PASS_MAX_DAYS = 4
+SINGLE_PASS_SAFETY_TOKENS = 700
+STRUCTURED_OUTPUT_OVERHEAD_TOKENS = 400
+SEGMENT_DAYS = 3
 
 FRESHNESS_TERMS = (
     "今日",
@@ -64,13 +73,51 @@ class PlannerState(TypedDict, total=False):
     result: dict[str, Any]
     violations: list[str]
     repair_count: int
+    timings: dict[str, float]
+    generation_strategy: str
 
 
 def needs_fresh_search(text: str) -> bool:
     return any(term in text for term in FRESHNESS_TERMS)
 
 
-def semantic_violations(plan: dict[str, Any], expected_days: int, allowed_urls: set[str]) -> list[str]:
+def estimate_prompt_tokens(text: str) -> int:
+    """Conservatively estimate Japanese/ASCII prompt tokens without a tokenizer.
+
+    Japanese characters are counted one-for-one while ASCII is estimated at
+    four characters per token. The decision also reserves fixed structured
+    output and safety headroom before allowing a four-day one-pass request.
+    """
+    ascii_chars = sum(1 for char in text if ord(char) < 128)
+    non_ascii_chars = len(text) - ascii_chars
+    return non_ascii_chars + (ascii_chars + 3) // 4
+
+
+def single_pass_output_budget(trip_days: int) -> int:
+    return 500 + 280 * trip_days
+
+
+def segment_output_budget(segment_days: int) -> int:
+    return 500 + 320 * segment_days
+
+
+def should_generate_single_pass(trip_days: int, prompt: str) -> bool:
+    if trip_days <= 3:
+        return True
+    if trip_days > SINGLE_PASS_MAX_DAYS:
+        return False
+    estimated_total = (
+        estimate_prompt_tokens(prompt)
+        + STRUCTURED_OUTPUT_OVERHEAD_TOKENS
+        + single_pass_output_budget(trip_days)
+        + SINGLE_PASS_SAFETY_TOKENS
+    )
+    return estimated_total <= MODEL_CONTEXT_TOKENS
+
+
+def semantic_violations(
+    plan: dict[str, Any], expected_days: int, allowed_urls: set[str]
+) -> list[str]:
     violations: list[str] = []
     days = plan.get("days", [])
     actual = [d.get("day") for d in days]
@@ -134,9 +181,9 @@ def day_bundle_schema_for_days(expected_days: int) -> dict[str, Any]:
     """Return a compact schema for short plans.
 
     Metadata and the full source list are deterministic application data, so
-    asking the small model to emit them wastes output tokens.  Keeping only
-    the requested days in the structured response prevents 2- and 3-day
-    plans from being truncated at vLLM's context/output boundary.
+    asking the small model to emit them wastes output tokens. Keeping only
+    the requested days in the structured response avoids truncation near the
+    vLLM context/output boundary.
     """
     schema = deepcopy(DAY_BUNDLE_SCHEMA)
     schema["properties"]["days"]["minItems"] = expected_days
@@ -154,6 +201,14 @@ def trim_extra_days(plan: dict[str, Any], expected_days: int) -> dict[str, Any]:
     days = [d for d in cleaned.get("days", []) if d.get("day", 0) <= expected_days]
     cleaned["days"] = sorted(days, key=lambda d: d.get("day", 0))[:expected_days]
     return cleaned
+
+
+def _timings_with(
+    state: PlannerState, key: str, started: float
+) -> dict[str, float]:
+    timings = dict(state.get("timings", {}))
+    timings[key] = round((time.perf_counter() - started) * 1000, 1)
+    return timings
 
 
 class PlannerWorkflow:
@@ -183,14 +238,46 @@ class PlannerWorkflow:
         return graph.compile()
 
     def run_plan(self, **kwargs) -> PlannerState:
-        state: PlannerState = {"mode": "plan", "repair_count": 0, **kwargs}
-        return self.graph.invoke(state)
+        started = time.perf_counter()
+        state: PlannerState = {
+            "mode": "plan",
+            "repair_count": 0,
+            "timings": {},
+            **kwargs,
+        }
+        result = self.graph.invoke(state)
+        timings = dict(result.get("timings", {}))
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        result["timings"] = timings
+        LOGGER.info(
+            "planner_metrics strategy=%s timings=%s last_llm=%s",
+            result.get("generation_strategy", "unknown"),
+            timings,
+            self.llm.last_request_metrics,
+        )
+        return result
 
     def run_refine(self, **kwargs) -> PlannerState:
-        state: PlannerState = {"mode": "refine", "repair_count": 0, **kwargs}
-        return self.graph.invoke(state)
+        started = time.perf_counter()
+        state: PlannerState = {
+            "mode": "refine",
+            "repair_count": 0,
+            "timings": {},
+            **kwargs,
+        }
+        result = self.graph.invoke(state)
+        timings = dict(result.get("timings", {}))
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000, 1)
+        result["timings"] = timings
+        LOGGER.info(
+            "planner_refine_metrics timings=%s last_llm=%s",
+            timings,
+            self.llm.last_request_metrics,
+        )
+        return result
 
     def _research(self, state: PlannerState) -> dict[str, Any]:
+        started = time.perf_counter()
         items = state.get("items", [])
         must_search = not items
         if state["mode"] == "refine":
@@ -203,48 +290,58 @@ class PlannerWorkflow:
                 add_web_search=state.get("add_web_search", False),
             )
             items = [i.model_dump() for i in found]
-        return {"items": items}
+        return {"items": items, "timings": _timings_with(state, "research_ms", started)}
 
     def _retrieve(self, state: PlannerState) -> dict[str, Any]:
+        started = time.perf_counter()
         items = [RetrievalItem(**i) for i in state.get("items", [])]
+        # Four-day plans can often fit in one Sarashina request after PR #14's
+        # compact output changes. Use one fewer evidence chunk only for that
+        # boundary case to leave enough context headroom for one-pass output.
+        retrieval_k = 5 if state["mode"] == "plan" and state["trip_days"] == 4 else 6
         context, sources = self.retriever.retrieve_for_plan(
             items=items,
             user_query=state["query"],
-            # Keep enough evidence for grounding while leaving headroom under
-            # Sarashina/vLLM's 8,192-token context limit.
-            k=6,
+            k=retrieval_k,
         )
         if not context:
             raise RuntimeError("関連情報を取得できませんでした。検索条件を変えてください。")
-        return {"context": context, "sources": sources}
+        return {
+            "context": context,
+            "sources": sources,
+            "timings": _timings_with(state, "retrieval_ms", started),
+        }
 
     def _generate(self, state: PlannerState) -> dict[str, Any]:
+        started = time.perf_counter()
         if state["mode"] == "refine":
-            return self._generate_refine(state)
-        return self._generate_initial(state)
+            output = self._generate_refine(state)
+        else:
+            output = self._generate_initial(state)
+        output["timings"] = _timings_with(state, "generation_ms", started)
+        return output
 
     def _generate_initial(self, state: PlannerState) -> dict[str, Any]:
         trip_days = state["trip_days"]
-        if trip_days <= 3:
-            prompt = build_plan_prompt(
-                trip_days=trip_days,
-                start_date=state["start_date"],
-                party=state["party"],
-                transport=state["transport"],
-                interests=state["interests"],
-                start_area=state["start_area"],
-                with_kids=state["with_kids"],
-                pace=state["pace"],
-                start_end_point=state["start_end_point"],
-                context=state["context"],
-            )
+        prompt = build_plan_prompt(
+            trip_days=trip_days,
+            start_date=state["start_date"],
+            party=state["party"],
+            transport=state["transport"],
+            interests=state["interests"],
+            start_area=state["start_area"],
+            with_kids=state["with_kids"],
+            pace=state["pace"],
+            start_end_point=state["start_end_point"],
+            context=state["context"],
+        )
+
+        if should_generate_single_pass(trip_days, prompt):
             raw = self.llm.generate_json(
                 prompt=prompt,
                 schema=day_bundle_schema_for_days(trip_days),
                 schema_name=f"days_1_{trip_days}",
-                # vLLMの8192上限に対し、RAGコンテキストが最大5793 tokens
-                # になるため、出力は日程部分だけにして余裕を確保する。
-                max_tokens=500 + 300 * trip_days,
+                max_tokens=single_pass_output_budget(trip_days),
             )
             bundle = DayBundle.model_validate(raw)
             expected = list(range(1, trip_days + 1))
@@ -253,28 +350,31 @@ class PlannerWorkflow:
                 raise ValueError(
                     f"旅程のday番号が不正です。expected={expected}, actual={actual}"
                 )
-            plan = {
-                "title": f"愛媛 {trip_days}日間プラン",
-                "summary": f"{state['party']}向けの{state['pace']}な愛媛旅行プランです。",
-                "audience": state["party"],
-                "transport": state["transport"],
-                "days": [day.model_dump() for day in bundle.days],
-                "sources": state["sources"],
-            }
+            days = [day.model_dump() for day in bundle.days]
+            strategy = f"single_pass_{trip_days}d"
         else:
-            plan = self._generate_segmented(state)
+            days = self._generate_segmented(state)
+            strategy = f"segmented_{trip_days}d"
 
+        plan = {
+            "title": f"愛媛 {trip_days}日間プラン",
+            "summary": f"{state['party']}向けの{state['pace']}な愛媛旅行プランです。",
+            "audience": state["party"],
+            "transport": state["transport"],
+            "days": days,
+            "sources": state["sources"],
+        }
         allowed = {s["url"] for s in state["sources"]}
         plan = sanitize_urls(plan, allowed)
         plan["sources"] = [SourceItem(**s).model_dump() for s in state["sources"]]
-        return {"result": plan}
+        return {"result": plan, "generation_strategy": strategy}
 
-    def _generate_segmented(self, state: PlannerState) -> dict[str, Any]:
+    def _generate_segmented(self, state: PlannerState) -> list[dict[str, Any]]:
         trip_days = state["trip_days"]
         all_days: list[dict[str, Any]] = []
         previous_day: dict[str, Any] | None = None
-        for start_day in range(1, trip_days + 1, 3):
-            end_day = min(trip_days, start_day + 2)
+        for start_day in range(1, trip_days + 1, SEGMENT_DAYS):
+            end_day = min(trip_days, start_day + SEGMENT_DAYS - 1)
             prompt = build_segment_prompt(
                 start_day=start_day,
                 end_day=end_day,
@@ -290,31 +390,24 @@ class PlannerWorkflow:
                 previous_day=previous_day,
                 context=state["context"],
             )
+            segment_days = end_day - start_day + 1
             raw = self.llm.generate_json(
                 prompt=prompt,
                 schema=day_bundle_schema_for_range(start_day, end_day),
                 schema_name=f"days_{start_day}_{end_day}",
-                # Keep each segment below the point where a T4 request is
-                # likely to be drained or duplicated during cold-start retry.
-                max_tokens=500 + 350 * (end_day - start_day + 1),
+                max_tokens=segment_output_budget(segment_days),
             )
             bundle = DayBundle.model_validate(raw)
             expected = list(range(start_day, end_day + 1))
             actual = [d.day for d in bundle.days]
             if actual != expected:
-                raise ValueError(f"分割旅程のday番号が不正です。expected={expected}, actual={actual}")
+                raise ValueError(
+                    f"分割旅程のday番号が不正です。expected={expected}, actual={actual}"
+                )
             dumped = [d.model_dump() for d in bundle.days]
             all_days.extend(dumped)
             previous_day = dumped[-1]
-
-        return {
-            "title": f"愛媛 {trip_days}日間プラン",
-            "summary": f"{state['party']}向けの{state['pace']}な愛媛旅行プランです。",
-            "audience": state["party"],
-            "transport": state["transport"],
-            "days": all_days,
-            "sources": state["sources"],
-        }
+        return all_days
 
     def _generate_refine(self, state: PlannerState) -> dict[str, Any]:
         prompt = build_refine_patch_prompt(
@@ -331,11 +424,14 @@ class PlannerWorkflow:
         patch = PlanPatch.model_validate(raw)
         merged = apply_patch(state["existing_plan"], patch)
         allowed = {s["url"] for s in state["sources"]}
-        allowed.update(s.get("url", "") for s in state["existing_plan"].get("sources", []))
+        allowed.update(
+            s.get("url", "") for s in state["existing_plan"].get("sources", [])
+        )
         merged = sanitize_urls(merged, allowed)
 
         source_by_url = {
-            s.get("url", ""): s for s in state["existing_plan"].get("sources", [])
+            s.get("url", ""): s
+            for s in state["existing_plan"].get("sources", [])
             if s.get("url")
         }
         for source in state["sources"]:
@@ -344,25 +440,37 @@ class PlannerWorkflow:
         return {"result": merged}
 
     def _validate(self, state: PlannerState) -> dict[str, Any]:
+        started = time.perf_counter()
         result = state["result"]
         try:
             validated = Itinerary.model_validate(result).model_dump()
         except ValidationError as exc:
-            return {"violations": [str(exc)]}
+            return {
+                "violations": [str(exc)],
+                "timings": _timings_with(state, "validation_ms", started),
+            }
 
         allowed = {s["url"] for s in state.get("sources", [])}
         allowed.update(s.get("url", "") for s in validated.get("sources", []))
         violations = semantic_violations(validated, state["trip_days"], allowed)
-        return {"result": validated, "violations": violations}
+        return {
+            "result": validated,
+            "violations": violations,
+            "timings": _timings_with(state, "validation_ms", started),
+        }
 
     def _route_after_validate(self, state: PlannerState) -> Literal["done", "repair"]:
         if not state.get("violations"):
             return "done"
         if state.get("repair_count", 0) >= 1:
-            raise ValueError("旅程の自動修復後も検証エラーが残りました: " + " / ".join(state["violations"]))
+            raise ValueError(
+                "旅程の自動修復後も検証エラーが残りました: "
+                + " / ".join(state["violations"])
+            )
         return "repair"
 
     def _repair(self, state: PlannerState) -> dict[str, Any]:
+        started = time.perf_counter()
         prompt = build_repair_prompt(
             invalid_plan=state["result"],
             violations=state.get("violations", []),
@@ -380,4 +488,8 @@ class PlannerWorkflow:
         allowed = {s["url"] for s in state["sources"]}
         plan = sanitize_urls(plan, allowed)
         plan["sources"] = [SourceItem(**s).model_dump() for s in state["sources"]]
-        return {"result": plan, "repair_count": state.get("repair_count", 0) + 1}
+        return {
+            "result": plan,
+            "repair_count": state.get("repair_count", 0) + 1,
+            "timings": _timings_with(state, "repair_ms", started),
+        }

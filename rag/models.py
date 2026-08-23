@@ -30,11 +30,11 @@ class DayPlan(StrictModel):
     day: int = Field(ge=1)
     theme: str = Field(max_length=48)
     area: str = Field(default="", max_length=40)
-    # 8,192-token contextで小型モデルのJSONが途中切れしないよう、
-    # 1日あたりの候補数をSchemaでも上限固定する。
+    # Bound both itinerary stops and source references so small-model
+    # structured output cannot grow without limit.
     schedule: list[ScheduleItem] = Field(min_length=1, max_length=2)
     notes: str = Field(default="", max_length=80)
-    source_urls: list[str] = Field(default_factory=list)
+    source_urls: list[str] = Field(default_factory=list, max_length=2)
 
 
 class Itinerary(StrictModel):
