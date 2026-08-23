@@ -33,6 +33,7 @@ def test_retries_modal_cold_start_503_then_succeeds():
         api_key="test-key",
         max_retries=2,
         retry_backoff_seconds=0,
+        cold_start_poll_seconds=0,
     )
 
     with patch("llm.sarashina_client.requests.post", side_effect=responses) as post:
@@ -46,6 +47,7 @@ def test_retries_modal_cold_start_503_then_succeeds():
     assert result == {"city": "松山"}
     assert post.call_count == 2
     sleep.assert_called_once_with(0)
+    assert client.last_request_metrics["retry_wait_ms"] == 0.0
 
 
 def test_raises_after_retry_budget_is_exhausted():
@@ -55,6 +57,7 @@ def test_raises_after_retry_budget_is_exhausted():
         api_key="test-key",
         max_retries=1,
         retry_backoff_seconds=0,
+        cold_start_poll_seconds=0,
     )
 
     with patch("llm.sarashina_client.requests.post", side_effect=responses) as post:
