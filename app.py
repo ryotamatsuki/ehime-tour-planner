@@ -39,6 +39,7 @@ SARASHINA_MODEL = st.secrets.get(
 # pre-release workflow/retriever objects after code-only deployments.
 WORKFLOW_CONFIG_VERSION = "spot-id-cache-v3-quality"
 RETRIEVER_CONFIG_VERSION = "canonical-spot-dedupe-v1"
+RESOURCE_CACHE_EPOCH = "pr20-quality-runtime-reverify-1"
 
 missing = []
 if not TAVILY_API_KEY:
@@ -57,8 +58,9 @@ if missing:
 def get_retriever(
     api_key: str,
     retriever_config_version: str,
+    resource_cache_epoch: str = RESOURCE_CACHE_EPOCH,
 ) -> CachedSpotRetriever:
-    del retriever_config_version
+    del retriever_config_version, resource_cache_epoch
     return CachedSpotRetriever(api_key=api_key)
 
 
@@ -70,9 +72,12 @@ def get_workflow(
     sarashina_model: str,
     workflow_config_version: str,
     retriever_config_version: str,
+    resource_cache_epoch: str = RESOURCE_CACHE_EPOCH,
 ) -> FastPlannerWorkflow:
-    del workflow_config_version
-    retriever = get_retriever(tavily_key, retriever_config_version)
+    del workflow_config_version, resource_cache_epoch
+    retriever = get_retriever(
+        tavily_key, retriever_config_version, RESOURCE_CACHE_EPOCH
+    )
     llm = SarashinaClient(
         base_url=sarashina_base_url,
         api_key=sarashina_api_key,
@@ -81,7 +86,9 @@ def get_workflow(
     return FastPlannerWorkflow(retriever=retriever, llm=llm)
 
 
-retriever = get_retriever(TAVILY_API_KEY, RETRIEVER_CONFIG_VERSION)
+retriever = get_retriever(
+    TAVILY_API_KEY, RETRIEVER_CONFIG_VERSION, RESOURCE_CACHE_EPOCH
+)
 workflow = get_workflow(
     TAVILY_API_KEY,
     SARASHINA_BASE_URL,
@@ -89,6 +96,7 @@ workflow = get_workflow(
     SARASHINA_MODEL,
     WORKFLOW_CONFIG_VERSION,
     RETRIEVER_CONFIG_VERSION,
+    RESOURCE_CACHE_EPOCH,
 )
 # A successful itinerary must never be turned into a failure only because an
 # older cached object does not yet expose telemetry fields.
