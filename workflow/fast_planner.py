@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 import time
+from copy import deepcopy
 from typing import Any
 
 from rag.models import SourceItem
@@ -56,6 +58,36 @@ def compact_output_budget(days: int) -> int:
     return 260 + 170 * days
 
 
+_EMPTY_THEME_PARENS = re.compile(r"\\s*(?:\\(\\s*\\)|（\\s*）)\\s*$")
+
+
+def _normalize_area(value: Any) -> str:
+    area = str(value or "").strip()
+    return area or "愛媛県内"
+
+
+def _normalize_theme(value: Any) -> str:
+    theme = str(value or "").strip()
+    theme = _EMPTY_THEME_PARENS.sub("", theme).strip()
+    return theme or "愛媛観光"
+
+
+def normalize_compact_bundle(raw: Any) -> Any:
+    """Defensively normalize model output before strict schema validation."""
+    if not isinstance(raw, dict):
+        return raw
+    cleaned = deepcopy(raw)
+    days = cleaned.get("days")
+    if not isinstance(days, list):
+        return cleaned
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        day["area"] = _normalize_area(day.get("area"))
+        day["theme"] = _normalize_theme(day.get("theme"))
+    return cleaned
+
+
 def hydrate_spot_bundle(
     bundle: CompactDayBundle,
     candidates: list[dict[str, Any]],
@@ -92,8 +124,8 @@ def hydrate_spot_bundle(
         days.append(
             {
                 "day": compact_day.day,
-                "theme": compact_day.theme,
-                "area": compact_day.area,
+                "theme": _normalize_theme(compact_day.theme),
+                "area": _normalize_area(compact_day.area),
                 "schedule": schedule,
                 "notes": compact_day.notes,
                 "source_urls": source_urls[:2],
@@ -167,7 +199,7 @@ class FastPlannerWorkflow(PlannerWorkflow):
                 max_tokens=compact_output_budget(trip_days),
                 temperature=0,
             )
-            bundle = CompactDayBundle.model_validate(raw)
+            bundle = CompactDayBundle.model_validate(normalize_compact_bundle(raw))
             expected = list(range(1, trip_days + 1))
             actual = [day.day for day in bundle.days]
             if actual != expected:
@@ -231,7 +263,7 @@ class FastPlannerWorkflow(PlannerWorkflow):
                 max_tokens=compact_output_budget(segment_days),
                 temperature=0,
             )
-            bundle = CompactDayBundle.model_validate(raw)
+            bundle = CompactDayBundle.model_validate(normalize_compact_bundle(raw))
             expected = list(range(start_day, end_day + 1))
             actual = [day.day for day in bundle.days]
             if actual != expected:
