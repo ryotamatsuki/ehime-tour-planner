@@ -1,5 +1,10 @@
 from rag.models import DayPlan, PlanPatch, ScheduleItem
-from workflow.planner import apply_patch, needs_fresh_search, semantic_violations
+from workflow.planner import (
+    apply_patch,
+    itinerary_schema_for_days,
+    needs_fresh_search,
+    semantic_violations,
+)
 
 
 def _plan():
@@ -95,3 +100,10 @@ def test_patch_replaces_only_target_day():
 
 def test_day_schema_limits_schedule_size():
     assert DayPlan.model_json_schema()["properties"]["schedule"]["maxItems"] == 2
+
+
+
+def test_itinerary_schema_limits_requested_day_count():
+    schema = itinerary_schema_for_days(1)
+    assert schema["properties"]["days"]["minItems"] == 1
+    assert schema["properties"]["days"]["maxItems"] == 1
