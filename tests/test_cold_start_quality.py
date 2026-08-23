@@ -6,9 +6,9 @@ from pydantic import ValidationError
 
 from rag.fast_retriever import CachedSpotRetriever, _CorpusIndex, canonical_spot_key
 from rag.retriever import Chunk, RetrievalItem
-from rag.spot_models import CompactDayPlan, SpotChoice
+from rag.spot_models import CompactDayBundle, CompactDayPlan, SpotChoice
 from utils.formatting import plan_json_to_markdown
-from workflow.fast_planner import normalize_compact_bundle
+from workflow.fast_planner import hydrate_spot_bundle, normalize_compact_bundle
 
 
 def test_canonical_spot_key_collapses_matsuyama_castle_title_variants():
@@ -117,3 +117,72 @@ def test_compact_bundle_normalizes_blank_area_and_empty_theme_parentheses():
     )
     assert normalized["days"][0]["area"] == "愛媛県内"
     assert normalized["days"][0]["theme"] == "城めぐり"
+
+
+def test_hydrate_spot_bundle_suppresses_cross_day_facility_repeats():
+    bundle = CompactDayBundle.model_validate(
+        {
+            "days": [
+                {
+                    "day": 1,
+                    "theme": "城めぐり",
+                    "area": "松山",
+                    "spots": [
+                        {
+                            "spot_id": "S001",
+                            "time": "09:00-10:00",
+                            "activity": "松山城を見学",
+                            "tip": "",
+                        }
+                    ],
+                    "notes": "",
+                },
+                {
+                    "day": 2,
+                    "theme": "別の地域",
+                    "area": "愛媛県内",
+                    "spots": [
+                        {
+                            "spot_id": "S002",
+                            "time": "09:00-10:00",
+                            "activity": "松山城の紅葉を楽しむ",
+                            "tip": "",
+                        }
+                    ],
+                    "notes": "",
+                },
+            ]
+        }
+    )
+    candidates = [
+        {
+            "spot_id": "S001",
+            "title": "松山城｜公式情報",
+            "url": "https://example.test/castle",
+            "site": "test",
+            "excerpt": "松山城の案内",
+            "canonical_key": "松山城",
+        },
+        {
+            "spot_id": "S002",
+            "title": "秋の愛媛モデルコース",
+            "url": "https://example.test/autumn",
+            "site": "test",
+            "excerpt": "松山城の紅葉",
+            "canonical_key": "秋愛媛モデルコース",
+        },
+        {
+            "spot_id": "S003",
+            "title": "道後温泉",
+            "url": "https://example.test/dogo",
+            "site": "test",
+            "excerpt": "道後温泉の案内",
+            "canonical_key": "道後温泉",
+        },
+    ]
+
+    days, _ = hydrate_spot_bundle(bundle, candidates)
+
+    assert days[0]["schedule"][0]["spot"].startswith("松山城")
+    assert days[1]["schedule"][0]["url"] == "https://example.test/dogo"
+    assert days[1]["schedule"][0]["activity"] == "候補スポットを訪問"
