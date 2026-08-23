@@ -8,6 +8,7 @@ from rag.fast_retriever import CachedSpotRetriever, _CorpusIndex, canonical_spot
 from rag.retriever import Chunk, RetrievalItem
 from rag.spot_models import CompactDayPlan, SpotChoice
 from utils.formatting import plan_json_to_markdown
+from workflow.fast_planner import normalize_compact_bundle
 
 
 def test_canonical_spot_key_collapses_matsuyama_castle_title_variants():
@@ -99,3 +100,20 @@ def test_modal_backend_defaults_to_scale_to_zero_fast_boot_with_rollback():
     assert 'os.getenv("VLLM_ENFORCE_EAGER") is not None' in source
     assert 'cmd.append("--enforce-eager")' in source
     assert 'cmd.append("--no-enforce-eager")' in source
+
+
+def test_compact_bundle_normalizes_blank_area_and_empty_theme_parentheses():
+    normalized = normalize_compact_bundle(
+        {
+            "days": [
+                {
+                    "day": 1,
+                    "theme": "城めぐり ()",
+                    "area": "   ",
+                    "spots": [],
+                }
+            ]
+        }
+    )
+    assert normalized["days"][0]["area"] == "愛媛県内"
+    assert normalized["days"][0]["theme"] == "城めぐり"
