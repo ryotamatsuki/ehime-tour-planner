@@ -46,11 +46,11 @@ def build_plan_prompt(
 【作成ルール】
 1. day は1から{trip_days}まで欠番なく作成する。
 2. 1日目は発着地が指定されていればそこから始め、最終日はそこへ戻る。
-3. 各日2〜3件程度を目安に、移動時間を含めて無理のない順序にする。
+3. 各日1〜2件だけに絞り、移動時間を含めて無理のない順序にする。
 4. schedule.time は原則 HH:MM-HH:MM 形式にする。
 5. source_urls と schedule.url は上記コンテキストに明示されたURLだけを使う。
 6. 根拠にない詳細は推測で補わず、tip に「要確認」と明示する。
-7. 省スペースJSONにする。各文字列は簡潔にし、activity/spot/address/tip/notes は各50文字以内にする。
+7. 省スペースJSONにする。各文字列はSchemaの文字数上限以内にし、説明を繰り返さない。
 8. title/summary/audience/transport/sources を含む完全な旅程JSONを返す。
 """
 
@@ -98,7 +98,7 @@ def build_segment_prompt(
 1. days には day={start_day} から day={end_day} までだけを欠番なく入れる。
 2. 直前の最終日がある場合は、その終点から自然につながるようにする。
 3. 最終区間に Day {trip_days} が含まれ、発着地が指定されている場合は最終的にそこへ戻る。
-4. 各日2〜3件程度。schedule.time は原則 HH:MM-HH:MM。各文字列は50文字以内。
+4. 各日1〜2件。schedule.time は原則 HH:MM-HH:MM。説明はSchemaの文字数上限以内。
 5. URLは検索コンテキストに明示されたものだけを使う。
 6. DayBundle JSONだけを返し、説明文やMarkdownコードフェンスを付けない。
 """

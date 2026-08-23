@@ -38,7 +38,9 @@ vllm_image = (
 @app.server(
     image=vllm_image,
     gpu="T4",
-    scaledown_window=60,
+    # Long structured-output requests can exceed one minute on a T4. Keep
+    # the container available while a request or retry is still in flight.
+    scaledown_window=600,
     startup_timeout=10 * MINUTES,
     volumes={
         "/root/.cache/huggingface": hf_cache,
@@ -46,7 +48,9 @@ vllm_image = (
     },
     secrets=[modal.Secret.from_name("ehime-tour-planner-vllm")],
     port=VLLM_PORT,
-    target_concurrency=4,
+    # Avoid competing long decodes on one T4 when a browser submits twice.
+    target_concurrency=1,
+    max_containers=1,
     unauthenticated=True,
 )
 class Server:
@@ -72,7 +76,7 @@ class Server:
             "--gpu-memory-utilization",
             "0.85",
             "--max-num-seqs",
-            "4",
+            "1",
             "--enable-prefix-caching",
             "--enforce-eager",
             "--generation-config",

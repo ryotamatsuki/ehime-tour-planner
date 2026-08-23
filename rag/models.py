@@ -16,22 +16,24 @@ class SourceItem(StrictModel):
 
 
 class ScheduleItem(StrictModel):
-    time: str = Field(description="開始時刻または時間帯。例: 09:00-10:00")
-    activity: str
-    spot: str
-    address: str = ""
-    url: str = ""
-    tip: str = ""
+    time: str = Field(
+        max_length=20, description="開始時刻または時間帯。例: 09:00-10:00"
+    )
+    activity: str = Field(max_length=48)
+    spot: str = Field(max_length=48)
+    address: str = Field(default="", max_length=80)
+    url: str = Field(default="", max_length=500)
+    tip: str = Field(default="", max_length=60)
 
 
 class DayPlan(StrictModel):
     day: int = Field(ge=1)
-    theme: str
-    area: str = ""
+    theme: str = Field(max_length=48)
+    area: str = Field(default="", max_length=40)
     # 8,192-token contextで小型モデルのJSONが途中切れしないよう、
     # 1日あたりの候補数をSchemaでも上限固定する。
     schedule: list[ScheduleItem] = Field(min_length=1, max_length=2)
-    notes: str = ""
+    notes: str = Field(default="", max_length=80)
     source_urls: list[str] = Field(default_factory=list)
 
 

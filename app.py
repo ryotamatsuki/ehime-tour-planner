@@ -33,7 +33,7 @@ SARASHINA_MODEL = st.secrets.get(
 )
 # Bump this when the client retry behavior changes so Streamlit does not reuse
 # a cached workflow containing an older SarashinaClient instance.
-SARASHINA_CLIENT_CONFIG_VERSION = "output-budget-v5"
+SARASHINA_CLIENT_CONFIG_VERSION = "stable-long-request-v6"
 
 missing = []
 if not TAVILY_API_KEY:
