@@ -18,8 +18,8 @@ class SarashinaClient:
         api_key: str,
         model: str = "sarashina",
         timeout: int = 300,
-        max_retries: int = 5,
-        retry_backoff_seconds: float = 2.0,
+        max_retries: int = 14,
+        retry_backoff_seconds: float = 3.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
