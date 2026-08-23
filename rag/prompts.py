@@ -12,6 +12,10 @@ SYSTEM_GUARDRAILS = """あなたは愛媛旅行の日本語プランナーです
 出力は指定JSON Schemaに厳密に従います。"""
 
 
+def _compact_json(value: dict) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
 def build_plan_prompt(
     *,
     trip_days: int,
@@ -26,7 +30,11 @@ def build_plan_prompt(
     context: list[str],
 ) -> str:
     ctx = "\n\n".join(context)
-    start_end = start_end_point if start_end_point and start_end_point != "指定なし" else "指定なし"
+    start_end = (
+        start_end_point
+        if start_end_point and start_end_point != "指定なし"
+        else "指定なし"
+    )
     return f"""{SYSTEM_GUARDRAILS}
 
 【旅行条件】
@@ -44,14 +52,14 @@ def build_plan_prompt(
 {ctx}
 
 【作成ルール】
-1. day は1から{trip_days}まで欠番なく作成する。
+1. days の day は1から{trip_days}まで欠番なく作成する。
 2. 1日目は発着地が指定されていればそこから始め、最終日はそこへ戻る。
 3. 各日1〜2件だけに絞り、移動時間を含めて無理のない順序にする。
 4. schedule.time は原則 HH:MM-HH:MM 形式にする。
 5. source_urls と schedule.url は上記コンテキストに明示されたURLだけを使う。
 6. 根拠にない詳細は推測で補わず、tip に「要確認」と明示する。
-7. 省スペースJSONにする。各文字列はSchemaの文字数上限以内にし、説明を繰り返さない。
-8. title/summary/audience/transport/sources を含む完全な旅程JSONを返す。
+7. 各文字列はSchemaの文字数上限以内にし、説明を繰り返さない。
+8. DayBundle JSONだけを返し、説明文やMarkdownコードフェンスを付けない。
 """
 
 
@@ -71,11 +79,11 @@ def build_segment_prompt(
     previous_day: dict | None,
     context: list[str],
 ) -> str:
-    prev = json.dumps(previous_day, ensure_ascii=False, indent=2) if previous_day else "なし"
+    # Put the large invariant prefix first so vLLM automatic prefix caching can
+    # reuse the travel conditions and RAG evidence across later segments.
     ctx = "\n\n".join(context)
+    prev = _compact_json(previous_day) if previous_day else "なし"
     return f"""{SYSTEM_GUARDRAILS}
-
-長期旅程を分割して作成します。今回は Day {start_day}〜Day {end_day} だけを作成してください。
 
 【旅行条件】
 - 全体日数: {trip_days}日
@@ -88,11 +96,12 @@ def build_segment_prompt(
 - ペース: {pace}
 - 発着地: {start_end_point or "指定なし"}
 
-【直前の最終日】
-{prev}
-
 【検索コンテキスト】
 {ctx}
+
+【今回の区間】
+Day {start_day}〜Day {end_day} だけを作成する。
+直前の最終日: {prev}
 
 【作成ルール】
 1. days には day={start_day} から day={end_day} までだけを欠番なく入れる。
@@ -110,7 +119,7 @@ def build_refine_patch_prompt(
     user_request: str,
     context: list[str],
 ) -> str:
-    plan_str = json.dumps(existing_plan, ensure_ascii=False, indent=2)
+    plan_str = _compact_json(existing_plan)
     ctx = "\n\n".join(context)
     return f"""{SYSTEM_GUARDRAILS}
 
@@ -137,7 +146,9 @@ def build_refine_patch_prompt(
 """
 
 
-def build_repair_prompt(*, invalid_plan: dict, violations: list[str], context: list[str]) -> str:
+def build_repair_prompt(
+    *, invalid_plan: dict, violations: list[str], context: list[str]
+) -> str:
     return f"""{SYSTEM_GUARDRAILS}
 
 次の旅程JSONには検証エラーがあります。内容を最小限修正し、完全な旅程JSONを返してください。
@@ -146,7 +157,7 @@ def build_repair_prompt(*, invalid_plan: dict, violations: list[str], context: l
 {chr(10).join("- " + v for v in violations)}
 
 【現在の旅程】
-{json.dumps(invalid_plan, ensure_ascii=False, indent=2)}
+{_compact_json(invalid_plan)}
 
 【利用可能な検索コンテキスト】
 {chr(10).join(context)}
