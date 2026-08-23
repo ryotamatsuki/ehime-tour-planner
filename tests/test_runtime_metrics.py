@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from workflow.planner import PlannerWorkflow
+
 from utils.runtime_metrics import (
     ensure_workflow_metrics_compatibility,
     snapshot_workflow_metrics,
@@ -72,3 +74,18 @@ def test_streamlit_entrypoint_busts_cache_and_uses_safe_snapshot():
     assert "ensure_workflow_metrics_compatibility(workflow)" in source
     assert "snapshot_workflow_metrics(workflow, final_state)" in source
     assert "dict(workflow.llm.last_request_metrics)" not in source
+
+
+class FakeGraph:
+    def invoke(self, state):
+        return {"generation_strategy": "spot_id_single_pass_2d", "timings": {}}
+
+
+def test_planner_logging_is_safe_for_legacy_cached_client():
+    workflow = PlannerWorkflow.__new__(PlannerWorkflow)
+    workflow.llm = LegacyClient()
+    workflow.graph = FakeGraph()
+
+    result = workflow.run_plan()
+
+    assert result["generation_strategy"] == "spot_id_single_pass_2d"
