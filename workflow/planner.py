@@ -144,6 +144,11 @@ def day_bundle_schema_for_days(expected_days: int) -> dict[str, Any]:
     return schema
 
 
+def day_bundle_schema_for_range(start_day: int, end_day: int) -> dict[str, Any]:
+    """Return a DayBundle schema constrained to one generated segment."""
+    return day_bundle_schema_for_days(end_day - start_day + 1)
+
+
 def trim_extra_days(plan: dict[str, Any], expected_days: int) -> dict[str, Any]:
     cleaned = deepcopy(plan)
     days = [d for d in cleaned.get("days", []) if d.get("day", 0) <= expected_days]
@@ -239,7 +244,7 @@ class PlannerWorkflow:
                 schema_name=f"days_1_{trip_days}",
                 # vLLMの8192上限に対し、RAGコンテキストが最大5793 tokens
                 # になるため、出力は日程部分だけにして余裕を確保する。
-                max_tokens=1800,
+                max_tokens=500 + 300 * trip_days,
             )
             bundle = DayBundle.model_validate(raw)
             expected = list(range(1, trip_days + 1))
@@ -287,9 +292,11 @@ class PlannerWorkflow:
             )
             raw = self.llm.generate_json(
                 prompt=prompt,
-                schema=DAY_BUNDLE_SCHEMA,
+                schema=day_bundle_schema_for_range(start_day, end_day),
                 schema_name=f"days_{start_day}_{end_day}",
-                max_tokens=2200,
+                # Keep each segment below the point where a T4 request is
+                # likely to be drained or duplicated during cold-start retry.
+                max_tokens=500 + 350 * (end_day - start_day + 1),
             )
             bundle = DayBundle.model_validate(raw)
             expected = list(range(start_day, end_day + 1))
