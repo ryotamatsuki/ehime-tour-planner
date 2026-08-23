@@ -58,7 +58,7 @@ def compact_output_budget(days: int) -> int:
     return 260 + 170 * days
 
 
-_EMPTY_THEME_PARENS = re.compile(r"\\s*(?:\\(\\s*\\)|（\\s*）)\\s*$")
+_EMPTY_THEME_PARENS = re.compile(r"\s*(?:\(\s*\)|（\s*）)\s*$")
 
 
 def _normalize_area(value: Any) -> str:
