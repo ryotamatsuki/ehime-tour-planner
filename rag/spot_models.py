@@ -17,7 +17,7 @@ class SpotChoice(StrictModel):
 class CompactDayPlan(StrictModel):
     day: int = Field(ge=1)
     theme: str = Field(max_length=48)
-    area: str = Field(default="", max_length=40)
+    area: str = Field(min_length=1, max_length=40)
     spots: list[SpotChoice] = Field(min_length=1, max_length=2)
     notes: str = Field(default="", max_length=80)
 
