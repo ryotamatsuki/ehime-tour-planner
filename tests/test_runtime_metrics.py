@@ -72,7 +72,7 @@ def test_streamlit_entrypoint_busts_versioned_resources_and_uses_safe_snapshot()
 
     assert 'WORKFLOW_CONFIG_VERSION = "spot-id-cache-v3-quality"' in source
     assert 'RETRIEVER_CONFIG_VERSION = "canonical-spot-dedupe-v1"' in source
-    assert 'RESOURCE_CACHE_EPOCH = "pr20-quality-runtime-reverify-1"' in source
+    assert 'RESOURCE_CACHE_EPOCH = "pr22-facility-dedupe-reverify-1"' in source
     assert "resource_cache_epoch" in source
     assert "WORKFLOW_CONFIG_VERSION," in source
     assert "RETRIEVER_CONFIG_VERSION," in source
