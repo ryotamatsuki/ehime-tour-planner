@@ -2,6 +2,7 @@ from rag.models import DayPlan, PlanPatch, ScheduleItem
 from workflow.planner import (
     apply_patch,
     day_bundle_schema_for_days,
+    day_bundle_schema_for_range,
     itinerary_schema_for_days,
     needs_fresh_search,
     semantic_violations,
@@ -111,6 +112,12 @@ def test_itinerary_schema_limits_requested_day_count():
 
 def test_day_bundle_schema_limits_requested_day_count():
     schema = day_bundle_schema_for_days(2)
+    assert schema["properties"]["days"]["minItems"] == 2
+    assert schema["properties"]["days"]["maxItems"] == 2
+
+
+def test_segment_schema_limits_requested_range():
+    schema = day_bundle_schema_for_range(4, 5)
     assert schema["properties"]["days"]["minItems"] == 2
     assert schema["properties"]["days"]["maxItems"] == 2
 
