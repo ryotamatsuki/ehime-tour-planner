@@ -21,9 +21,10 @@ class SarashinaClient:
         model: str = "sarashina",
         timeout: int = 300,
         max_retries: int | None = None,
-        cold_start_retries: int = 24,
+        cold_start_retries: int = 120,
         generation_retries: int = 2,
         retry_backoff_seconds: float = 3.0,
+        cold_start_poll_seconds: float = 2.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -37,6 +38,7 @@ class SarashinaClient:
         self.cold_start_retries = max(0, cold_start_retries)
         self.generation_retries = max(0, generation_retries)
         self.retry_backoff_seconds = max(0.0, retry_backoff_seconds)
+        self.cold_start_poll_seconds = max(0.0, cold_start_poll_seconds)
         self._ready_seen = False
         self.last_request_metrics: dict[str, Any] = {}
 
@@ -103,6 +105,7 @@ class SarashinaClient:
         started = time.perf_counter()
         response = None
         attempts = 0
+        retry_wait_ms = 0.0
 
         for attempt in range(retry_budget + 1):
             attempts = attempt + 1
@@ -118,13 +121,14 @@ class SarashinaClient:
                         attempts=attempts,
                         status_code=None,
                         usage=None,
+                        retry_wait_ms=retry_wait_ms,
                     )
                     raise
-                self._sleep_before_retry(attempt)
+                retry_wait_ms += self._sleep_before_retry(attempt, phase)
                 continue
 
             if response.status_code in RETRYABLE_STATUS_CODES and attempt < retry_budget:
-                self._sleep_before_retry(attempt)
+                retry_wait_ms += self._sleep_before_retry(attempt, phase)
                 continue
 
             if response.status_code >= 400:
@@ -134,6 +138,7 @@ class SarashinaClient:
                     attempts=attempts,
                     status_code=response.status_code,
                     usage=None,
+                    retry_wait_ms=retry_wait_ms,
                 )
                 response.raise_for_status()
             break
@@ -149,6 +154,7 @@ class SarashinaClient:
             attempts=attempts,
             status_code=response.status_code,
             usage=data.get("usage") if isinstance(data, dict) else None,
+            retry_wait_ms=retry_wait_ms,
         )
         return data
 
@@ -160,12 +166,14 @@ class SarashinaClient:
         attempts: int,
         status_code: int | None,
         usage: Any,
+        retry_wait_ms: float = 0.0,
     ) -> None:
         metrics: dict[str, Any] = {
             "phase": phase,
             "attempts": attempts,
             "retries": max(0, attempts - 1),
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "retry_wait_ms": round(retry_wait_ms, 1),
             "status_code": status_code,
         }
         if isinstance(usage, dict):
@@ -199,6 +207,14 @@ class SarashinaClient:
                 return json.loads(text[start : end + 1])
             raise
 
-    def _sleep_before_retry(self, attempt: int) -> None:
-        delay = self.retry_backoff_seconds * (2**attempt)
-        time.sleep(min(delay, 15.0))
+    def _sleep_before_retry(self, attempt: int, phase: str) -> float:
+        if phase == "cold_start":
+            # A 5xx during scale-from-zero is a readiness signal, not a reason
+            # for increasingly long blind sleeps. Poll frequently so the first
+            # ready replica is used promptly. The larger cold retry budget keeps
+            # the same multi-minute startup tolerance.
+            delay = self.cold_start_poll_seconds
+        else:
+            delay = min(self.retry_backoff_seconds * (2**attempt), 15.0)
+        time.sleep(delay)
+        return delay * 1000.0
