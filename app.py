@@ -35,9 +35,10 @@ SARASHINA_API_KEY = st.secrets.get(
 SARASHINA_MODEL = st.secrets.get(
     "SARASHINA_MODEL", os.getenv("SARASHINA_MODEL", "sarashina")
 )
-# Bump when workflow/retry/telemetry compatibility changes so Streamlit cannot
-# reuse a cached workflow containing an older SarashinaClient instance.
-SARASHINA_CLIENT_CONFIG_VERSION = "spot-id-cache-v2-metrics-compat"
+# Explicit cache versions prevent a long-lived Streamlit process from reusing
+# pre-release workflow/retriever objects after code-only deployments.
+WORKFLOW_CONFIG_VERSION = "spot-id-cache-v3-quality"
+RETRIEVER_CONFIG_VERSION = "canonical-spot-dedupe-v1"
 
 missing = []
 if not TAVILY_API_KEY:
@@ -53,7 +54,11 @@ if missing:
 
 
 @st.cache_resource
-def get_retriever(api_key: str) -> CachedSpotRetriever:
+def get_retriever(
+    api_key: str,
+    retriever_config_version: str,
+) -> CachedSpotRetriever:
+    del retriever_config_version
     return CachedSpotRetriever(api_key=api_key)
 
 
@@ -63,10 +68,11 @@ def get_workflow(
     sarashina_base_url: str,
     sarashina_api_key: str,
     sarashina_model: str,
-    client_config_version: str,
+    workflow_config_version: str,
+    retriever_config_version: str,
 ) -> FastPlannerWorkflow:
-    del client_config_version
-    retriever = get_retriever(tavily_key)
+    del workflow_config_version
+    retriever = get_retriever(tavily_key, retriever_config_version)
     llm = SarashinaClient(
         base_url=sarashina_base_url,
         api_key=sarashina_api_key,
@@ -75,13 +81,14 @@ def get_workflow(
     return FastPlannerWorkflow(retriever=retriever, llm=llm)
 
 
-retriever = get_retriever(TAVILY_API_KEY)
+retriever = get_retriever(TAVILY_API_KEY, RETRIEVER_CONFIG_VERSION)
 workflow = get_workflow(
     TAVILY_API_KEY,
     SARASHINA_BASE_URL,
     SARASHINA_API_KEY,
     SARASHINA_MODEL,
-    SARASHINA_CLIENT_CONFIG_VERSION,
+    WORKFLOW_CONFIG_VERSION,
+    RETRIEVER_CONFIG_VERSION,
 )
 # A successful itinerary must never be turned into a failure only because an
 # older cached object does not yet expose telemetry fields.
