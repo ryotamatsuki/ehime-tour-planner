@@ -90,3 +90,8 @@ def test_patch_replaces_only_target_day():
     updated = apply_patch(plan, patch)
     assert updated["days"][0]["theme"] == "松山"
     assert updated["days"][1]["theme"] == "ゆったり道後"
+
+
+
+def test_day_schema_limits_schedule_size():
+    assert DayPlan.model_json_schema()["properties"]["schedule"]["maxItems"] == 2
