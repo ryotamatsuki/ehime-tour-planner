@@ -5,9 +5,9 @@ import pandas as pd
 import streamlit as st
 
 from llm.sarashina_client import SarashinaClient
-from rag.retriever import EhimeRetriever
+from rag.fast_retriever import CachedSpotRetriever
 from utils.formatting import plan_json_to_markdown
-from workflow.planner import PlannerWorkflow
+from workflow.fast_planner import FastPlannerWorkflow
 
 
 st.set_page_config(
@@ -31,9 +31,9 @@ SARASHINA_API_KEY = st.secrets.get(
 SARASHINA_MODEL = st.secrets.get(
     "SARASHINA_MODEL", os.getenv("SARASHINA_MODEL", "sarashina")
 )
-# Bump this when the client retry behavior changes so Streamlit does not reuse
-# a cached workflow containing an older SarashinaClient instance.
-SARASHINA_CLIENT_CONFIG_VERSION = "stable-long-request-v6"
+# Bump when workflow/retry behavior changes so Streamlit cannot reuse an old
+# cached workflow instance after deploy.
+SARASHINA_CLIENT_CONFIG_VERSION = "spot-id-cache-v1"
 
 missing = []
 if not TAVILY_API_KEY:
@@ -49,8 +49,8 @@ if missing:
 
 
 @st.cache_resource
-def get_retriever(api_key: str) -> EhimeRetriever:
-    return EhimeRetriever(api_key=api_key)
+def get_retriever(api_key: str) -> CachedSpotRetriever:
+    return CachedSpotRetriever(api_key=api_key)
 
 
 @st.cache_resource
@@ -60,7 +60,7 @@ def get_workflow(
     sarashina_api_key: str,
     sarashina_model: str,
     client_config_version: str,
-) -> PlannerWorkflow:
+) -> FastPlannerWorkflow:
     del client_config_version
     retriever = get_retriever(tavily_key)
     llm = SarashinaClient(
@@ -68,7 +68,7 @@ def get_workflow(
         api_key=sarashina_api_key,
         model=sarashina_model,
     )
-    return PlannerWorkflow(retriever=retriever, llm=llm)
+    return FastPlannerWorkflow(retriever=retriever, llm=llm)
 
 
 retriever = get_retriever(TAVILY_API_KEY)
@@ -86,6 +86,23 @@ if "plan_json" not in st.session_state:
     st.session_state.plan_json = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "last_metrics" not in st.session_state:
+    st.session_state.last_metrics = None
+
+
+def snapshot_metrics(final_state: dict) -> dict:
+    return {
+        "strategy": final_state.get("generation_strategy", "unknown"),
+        "planner": dict(final_state.get("timings", {})),
+        "retrieval": dict(getattr(workflow.retriever, "last_metrics", {})),
+        "llm": dict(workflow.llm.last_request_metrics),
+    }
+
+
+def seconds_label(value) -> str:
+    if not isinstance(value, (int, float)):
+        return "—"
+    return f"{value / 1000:.1f}s"
 
 
 st.sidebar.header("プラン条件")
@@ -156,10 +173,10 @@ with st.sidebar:
         value="標準",
     )
 
-    if trip_days > 3:
-        st.caption(
-            "4日以上は3日単位に分割生成し、Sarashinaの長文生成負荷を抑えます。"
-        )
+    if trip_days == 4:
+        st.caption("4日は入力サイズに余裕があれば1回生成し、超える場合だけ分割します。")
+    elif trip_days >= 5:
+        st.caption("5日以上は3日単位に分割し、各区間をcompactなspot-ID形式で生成します。")
 
     generate_btn = st.button("プラン生成", type="primary")
 
@@ -184,7 +201,7 @@ with col_l:
                     max_results=max_results,
                     add_web_search=add_web_search,
                 )
-            st.session_state.items = [i.model_dump() for i in items]
+            st.session_state.items = [item.model_dump() for item in items]
             st.success(f"{len(items)}件を取り込みました。")
         except Exception as exc:
             st.error(f"検索に失敗しました: {exc}")
@@ -231,6 +248,7 @@ if generate_btn:
         st.session_state.items = final_state.get(
             "items", st.session_state.get("items", [])
         )
+        st.session_state.last_metrics = snapshot_metrics(final_state)
         st.session_state.messages = [
             {
                 "role": "assistant",
@@ -268,6 +286,50 @@ if st.session_state.plan_json:
             f"- [{source['title']}]({source['url']}) — {source.get('site', '')}"
         )
 
+    metrics = st.session_state.get("last_metrics")
+    if metrics:
+        with st.expander("4) 性能計測（直近実行）", expanded=True):
+            planner_metrics = metrics.get("planner", {})
+            retrieval_metrics = metrics.get("retrieval", {})
+            llm_metrics = metrics.get("llm", {})
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("総所要時間", seconds_label(planner_metrics.get("total_ms")))
+            c2.metric("生成", seconds_label(planner_metrics.get("generation_ms")))
+            c3.metric("RAG", seconds_label(planner_metrics.get("retrieval_ms")))
+            c4.metric("生成戦略", metrics.get("strategy", "unknown"))
+
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric(
+                "Embedding cache",
+                "HIT" if retrieval_metrics.get("cache_hit") else "MISS",
+            )
+            r2.metric(
+                "文書embedding",
+                seconds_label(retrieval_metrics.get("doc_embedding_ms")),
+            )
+            r3.metric(
+                "Query embedding",
+                seconds_label(retrieval_metrics.get("query_embedding_ms")),
+            )
+            r4.metric("候補spot数", retrieval_metrics.get("candidate_count", "—"))
+
+            l1, l2, l3, l4 = st.columns(4)
+            l1.metric("LLM API", seconds_label(llm_metrics.get("elapsed_ms")))
+            l2.metric("LLM phase", llm_metrics.get("phase", "—"))
+            l3.metric("retry", llm_metrics.get("retries", "—"))
+            l4.metric(
+                "tokens",
+                (
+                    f"{llm_metrics.get('prompt_tokens', '—')} → "
+                    f"{llm_metrics.get('completion_tokens', '—')}"
+                ),
+            )
+            st.caption(
+                "cache HIT時は同じ取得文書のdense embeddingを再計算せず、"
+                "query embeddingだけを更新します。"
+            )
+
     st.divider()
 
 
@@ -291,6 +353,7 @@ if prompt := st.chat_input("プランの修正点を入力してください"):
             st.session_state.items = final_state.get(
                 "items", st.session_state.get("items", [])
             )
+            st.session_state.last_metrics = snapshot_metrics(final_state)
             response_text = "プランを修正しました。"
         except Exception as exc:
             response_text = f"プランの修正に失敗しました: {exc}"
@@ -308,9 +371,10 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.plan_json = None
         st.session_state.items = []
+        st.session_state.last_metrics = None
         st.rerun()
 
     st.caption(
-        "生成AIは旅程候補の整理に利用します。営業時間・運休・料金など、"
-        "最新情報は必ずリンク先で確認してください。"
+        "生成AIは候補spotの選択・順序・短い説明に利用します。URL等は検索結果から"
+        "Python側で復元します。営業時間・運休・料金などはリンク先で確認してください。"
     )
