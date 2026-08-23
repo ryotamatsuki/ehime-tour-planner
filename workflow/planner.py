@@ -122,11 +122,27 @@ def apply_patch(plan: dict[str, Any], patch: PlanPatch) -> dict[str, Any]:
     updated["days"] = [day_map[k] for k in sorted(day_map)]
     return updated
 
+
 def itinerary_schema_for_days(expected_days: int) -> dict[str, Any]:
     schema = deepcopy(ITINERARY_SCHEMA)
     schema["properties"]["days"]["minItems"] = expected_days
     schema["properties"]["days"]["maxItems"] = expected_days
     return schema
+
+
+def day_bundle_schema_for_days(expected_days: int) -> dict[str, Any]:
+    """Return a compact schema for short plans.
+
+    Metadata and the full source list are deterministic application data, so
+    asking the small model to emit them wastes output tokens.  Keeping only
+    the requested days in the structured response prevents 2- and 3-day
+    plans from being truncated at vLLM's context/output boundary.
+    """
+    schema = deepcopy(DAY_BUNDLE_SCHEMA)
+    schema["properties"]["days"]["minItems"] = expected_days
+    schema["properties"]["days"]["maxItems"] = expected_days
+    return schema
+
 
 def trim_extra_days(plan: dict[str, Any], expected_days: int) -> dict[str, Any]:
     cleaned = deepcopy(plan)
@@ -219,15 +235,27 @@ class PlannerWorkflow:
             )
             raw = self.llm.generate_json(
                 prompt=prompt,
-                schema=itinerary_schema_for_days(trip_days),
-                schema_name="itinerary",
+                schema=day_bundle_schema_for_days(trip_days),
+                schema_name=f"days_1_{trip_days}",
                 # vLLMの8192上限に対し、RAGコンテキストが最大5793 tokens
-                # になるため、入力+出力が必ず上限内に収まるようにする。
-                max_tokens=2000,
+                # になるため、出力は日程部分だけにして余裕を確保する。
+                max_tokens=1800,
             )
-            plan = trim_extra_days(
-                Itinerary.model_validate(raw).model_dump(), trip_days
-            )
+            bundle = DayBundle.model_validate(raw)
+            expected = list(range(1, trip_days + 1))
+            actual = [day.day for day in bundle.days]
+            if actual != expected:
+                raise ValueError(
+                    f"旅程のday番号が不正です。expected={expected}, actual={actual}"
+                )
+            plan = {
+                "title": f"愛媛 {trip_days}日間プラン",
+                "summary": f"{state['party']}向けの{state['pace']}な愛媛旅行プランです。",
+                "audience": state["party"],
+                "transport": state["transport"],
+                "days": [day.model_dump() for day in bundle.days],
+                "sources": state["sources"],
+            }
         else:
             plan = self._generate_segmented(state)
 
