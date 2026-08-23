@@ -1,26 +1,21 @@
 from __future__ import annotations
-import re
-import time
+
 import html
-import hashlib
-import json
-from typing import List, Tuple
+import os
+import re
+from dataclasses import dataclass
+from typing import Iterable
 
 import numpy as np
-from pydantic import BaseModel, Field
-from tavily import TavilyClient
 from bs4 import BeautifulSoup
+from pydantic import BaseModel
+from rank_bm25 import BM25Okapi
+from tavily import TavilyClient
 
-from google import genai
-from google.genai import types
 
-# --- 切替: FAISS を使わず Numpy 類似度のみでも動かせる ---
-USE_FAISS = True
-try:
-    if USE_FAISS:
-        import faiss  # type: ignore
-except Exception:
-    USE_FAISS = False
+RURI_MODEL_ID = os.getenv("RURI_MODEL_ID", "cl-nagoya/ruri-v3-30m")
+RRF_K = 60
+
 
 class RetrievalItem(BaseModel):
     title: str
@@ -29,280 +24,195 @@ class RetrievalItem(BaseModel):
     content: str
     content_chars: int
 
-class EhimeRetriever:
-    def __init__(self, api_key: str):
-        self.client = TavilyClient(api_key)
-        self.gclient = genai.Client()  # GEMINI_API_KEY は環境/Secrets から
 
-    # --- 1) 検索→抽出→要約/クリーニング ---
+@dataclass
+class Chunk:
+    text: str
+    title: str
+    url: str
+    site: str
+
+
+def _tokenize_for_bm25(text: str) -> list[str]:
+    """Dependency-free Japanese-friendly tokenizer.
+
+    Uses ASCII/alphanumeric words plus Japanese character bi-grams.
+    Dense retrieval handles semantics; BM25 mainly contributes exact names.
+    """
+    normalized = re.sub(r"\s+", "", text.lower())
+    ascii_tokens = re.findall(r"[a-z0-9][a-z0-9._-]*", normalized)
+    jp = "".join(re.findall(r"[\u3040-\u30ff\u3400-\u9fff]", normalized))
+    bigrams = [jp[i : i + 2] for i in range(max(0, len(jp) - 1))]
+    return ascii_tokens + bigrams or [normalized[:64]]
+
+
+class EhimeRetriever:
+    def __init__(self, api_key: str | None = None):
+        self.client = TavilyClient(api_key) if api_key else None
+        self._embedding_model = None
+
+    @property
+    def embedding_model(self):
+        if self._embedding_model is None:
+            from sentence_transformers import SentenceTransformer
+
+            self._embedding_model = SentenceTransformer(RURI_MODEL_ID, device="cpu")
+        return self._embedding_model
+
     def search_and_prepare(
         self,
         query: str,
         max_results: int = 8,
         add_web_search: bool = False,
-    ) -> List[RetrievalItem]:
-        items: List[RetrievalItem] = []
-        seen_urls = set()
+    ) -> list[RetrievalItem]:
+        if self.client is None:
+            raise RuntimeError("TAVILY_API_KEY が設定されていません。")
 
-        # 配分を決定
-        if add_web_search:
-            iyokan_results_count = max_results // 2
-            web_results_count = max_results - iyokan_results_count
-        else:
-            iyokan_results_count = max_results
-            web_results_count = 0
+        items: list[RetrievalItem] = []
+        seen_urls: set[str] = set()
+        iyokan_count = max_results if not add_web_search else max(1, max_results // 2)
+        web_count = max_results - iyokan_count
+        search_depth = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
 
-        def _process_results(results, is_iyokan: bool):
-            for r in results:
-                url = r.get("url", "")
+        def process(results: Iterable[dict], is_iyokan: bool) -> None:
+            for row in results:
+                url = str(row.get("url", "") or "")
                 if not url or url in seen_urls:
                     continue
-
-                title = r.get("title", "") or url
-                raw_md = r.get("raw_content", "") or "\n".join(r.get("content", []))
-                
-                site_name = "いよ観ネット" if is_iyokan else url.split('/')[2].replace("www.", "")
-
-                cleaned = self._clean_text(raw_md)
+                title = str(row.get("title", "") or url)
+                raw = row.get("raw_content") or row.get("content") or ""
+                if isinstance(raw, list):
+                    raw = "\n".join(map(str, raw))
+                cleaned = self._clean_text(str(raw))
                 if not cleaned:
-                    try:
-                        ext = self.client.extract(url)
-                        cleaned = self._clean_text(ext.get("text", ""))
-                    except Exception:
-                        continue
-                
-                if cleaned:
-                    items.append(RetrievalItem(
+                    continue
+                site = "いよ観ネット" if is_iyokan else self._site_from_url(url)
+                items.append(
+                    RetrievalItem(
                         title=title[:180],
                         url=url,
-                        site=site_name,
-                        content=cleaned[:10000],
+                        site=site,
+                        content=cleaned[:12000],
                         content_chars=len(cleaned),
-                    ))
-                    seen_urls.add(url)
-
-        # 1. いよ観ネットを検索
-        if iyokan_results_count > 0:
-            try:
-                resp_iyokan = self.client.search(
-                    query=query, search_depth="advanced", include_raw_content="markdown",
-                    include_answer=False, include_domains=["iyokannet.jp"],
-                    max_results=iyokan_results_count, chunks_per_source=3, timeout=120
+                    )
                 )
-                _process_results(resp_iyokan.get("results", []), is_iyokan=True)
-            except Exception as e:
-                print(f"Error searching iyokannet.jp: {e}")
+                seen_urls.add(url)
 
-        # 2. ウェブ全体を検索 (追加が有効な場合)
-        if web_results_count > 0:
-            try:
-                resp_web = self.client.search(
-                    query=query, search_depth="advanced", include_raw_content="markdown",
-                    include_answer=False, max_results=web_results_count, 
-                    chunks_per_source=3, timeout=120
-                )
-                _process_results(resp_web.get("results", []), is_iyokan=False)
-            except Exception as e:
-                print(f"Error searching web: {e}")
+        iyokan = self.client.search(
+            query=query,
+            search_depth=search_depth,
+            include_raw_content="markdown",
+            include_answer=False,
+            include_domains=["iyokannet.jp"],
+            max_results=iyokan_count,
+        )
+        process(iyokan.get("results", []), True)
+
+        if add_web_search and web_count > 0:
+            web = self.client.search(
+                query=query,
+                search_depth=search_depth,
+                include_raw_content="markdown",
+                include_answer=False,
+                max_results=web_count,
+            )
+            process(web.get("results", []), False)
 
         return items
 
-    def _clean_text(self, text: str) -> str:
-        if not text:
-            return ""
-        # Markdown/HTML → テキスト
-        soup = BeautifulSoup(text, "html.parser")
-        txt = soup.get_text(separator="n")
-        txt = html.unescape(txt)
-        txt = re.sub(r"n{3,}", "nn", txt)
-        txt = re.sub(r"s+", " ", txt)
-        # いよ観ネットの原文転載を避けるため、チャンク化前に短縮
-        return txt.strip()
+    def retrieve_for_plan(
+        self,
+        items: list[RetrievalItem],
+        user_query: str,
+        k: int = 8,
+    ) -> tuple[list[str], list[dict]]:
+        chunks = self._make_chunks(items)
+        if not chunks:
+            return [], []
 
-    # --- 2) 埋め込みユーティリティ ---
-    def _embed(self, texts: List[str], task_type: str, dim: int = 768) -> np.ndarray:
-        all_vecs = []
-        # Process in batches to respect API limits (e.g., 100 texts per batch)
-        # and add a delay to respect rate limits (e.g., 60 requests per minute)
-        batch_size = 100 
-        
-        for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i : i + batch_size]
-            if not batch_texts:
+        bm25_tokens = [_tokenize_for_bm25(c.text) for c in chunks]
+        bm25 = BM25Okapi(bm25_tokens)
+        bm25_scores = np.asarray(bm25.get_scores(_tokenize_for_bm25(user_query)))
+        bm25_order = np.argsort(-bm25_scores).tolist()
+
+        doc_texts = [f"検索文書: {c.text}" for c in chunks]
+        query_text = [f"検索クエリ: {user_query}"]
+        doc_vecs = self.embedding_model.encode(
+            doc_texts,
+            batch_size=16,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
+        q_vec = self.embedding_model.encode(
+            query_text,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )[0]
+        dense_scores = doc_vecs @ q_vec
+        dense_order = np.argsort(-dense_scores).tolist()
+
+        fused: dict[int, float] = {}
+        for order in (bm25_order, dense_order):
+            for rank, idx in enumerate(order, start=1):
+                fused[idx] = fused.get(idx, 0.0) + 1.0 / (RRF_K + rank)
+
+        ranked = sorted(fused, key=fused.get, reverse=True)
+        selected: list[Chunk] = []
+        per_url: dict[str, int] = {}
+        for idx in ranked:
+            ch = chunks[idx]
+            if per_url.get(ch.url, 0) >= 2:
                 continue
-            
-            cfg = types.EmbedContentConfig(task_type=task_type, output_dimensionality=dim)
-            try:
-                res = self.gclient.models.embed_content(
-                    model="gemini-embedding-001",
-                    contents=batch_texts,
-                    config=cfg,
+            selected.append(ch)
+            per_url[ch.url] = per_url.get(ch.url, 0) + 1
+            if len(selected) >= k:
+                break
+
+        context = [
+            f"出典: {c.title}\nURL: {c.url}\nサイト: {c.site}\n内容:\n{c.text}"
+            for c in selected
+        ]
+        sources: list[dict] = []
+        seen: set[str] = set()
+        for c in selected:
+            if c.url not in seen:
+                sources.append({"title": c.title, "url": c.url, "site": c.site})
+                seen.add(c.url)
+        return context, sources
+
+    def _make_chunks(self, items: list[RetrievalItem], size: int = 1000, overlap: int = 120) -> list[Chunk]:
+        chunks: list[Chunk] = []
+        step = max(1, size - overlap)
+        for item in items:
+            text = item.content
+            for start in range(0, len(text), step):
+                part = text[start : start + size].strip()
+                if len(part) < 80:
+                    continue
+                chunks.append(
+                    Chunk(
+                        text=part,
+                        title=item.title,
+                        url=item.url,
+                        site=item.site,
+                    )
                 )
-                
-                batch_vecs = [np.array(e.values, dtype="float32") for e in res.embeddings]
-                all_vecs.extend(batch_vecs)
-                
-                # If there are more batches to process, wait to avoid hitting rate limits.
-                if i + batch_size < len(texts):
-                    print(f"Embedding batch {i//batch_size + 1} complete. Waiting for 5 seconds...")
-                    time.sleep(5)
-
-            except Exception as e:
-                print(f"An error occurred during embedding batch {i//batch_size + 1}: {e}")
-                # Continue to the next batch if one fails
-                continue
-
-        if not all_vecs:
-            # Handle case where all embedding calls failed
-            return np.array([], dtype="float32").reshape(0, dim)
-
-        return np.vstack(all_vecs)
-
-    # --- 3) ベクトル化 → 検索 ---
-    def _build_index(self, chunks: List[str]):
-        X = self._embed(chunks, task_type="RETRIEVAL_DOCUMENT")
-        if USE_FAISS:
-            index = faiss.IndexFlatIP(X.shape[1])
-            faiss.normalize_L2(X)
-            index.add(X)
-            return index, X
-        # 代替: 生行列を返す
-        return None, X
-
-    def _search_index(self, index, X: np.ndarray, q: np.ndarray, topk: int = 8) -> Tuple[List[int], List[float]]:
-        if USE_FAISS and index is not None:
-            faiss.normalize_L2(q)
-            D, I = index.search(q, topk)
-            return I[0].tolist(), D[0].tolist()
-        # 代替: NumPy コサイン類似度
-        # 正規化
-        Xn = X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-9)
-        qn = q / (np.linalg.norm(q, axis=1, keepdims=True) + 1e-9)
-        sims = Xn @ qn.T
-        order = np.argsort(-sims[:, 0])[:topk]
-        return order.tolist(), sims[order, 0].tolist()
-
-    def _chunk(self, text: str, size: int = 800, overlap: int = 120) -> List[str]:
-        # 文字ベース簡易チャンク（和文前提）
-        chunks = []
-        i = 0
-        while i < len(text):
-            chunks.append(text[i : i + size])
-            i += size - overlap
         return chunks
 
-    def retrieve_for_plan(self, items: List[RetrievalItem], user_query: str, k: int = 8):
-        chunk_texts, chunk_meta = [], []
-        for it in items:
-            chunks = self._chunk(it.content)
-            for ch in chunks:
-                chunk_texts.append(ch)
-                chunk_meta.append({"title": it.title, "url": it.url, "site": it.site})
-    
-        if not chunk_texts:
-            return [], []
-    
-        index, X = self._build_index(chunk_texts)
-        if X.shape[0] == 0:
-            return [], []
-    
-        q = self._embed([user_query], task_type="RETRIEVAL_QUERY")
-        ids, scores = self._search_index(index, X, q, topk=k)
-    
-        # 1) まず「URLあたり1チャンク」に絞る（ここが効く）
-        picked = []
-        used_sources = []
-        seen_urls = set()
-    
-        for idx in ids:
-            meta = chunk_meta[idx]
-            url = meta["url"]
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-            used_sources.append(meta)
-            picked.append(idx)
-            # 無料枠前提なら 4〜5 程度が安全（任意で調整）
-            if len(picked) >= min(k, 5):
-                break
-    
-        if not picked:
-            return [], []
-    
-        # 2) 要約をまとめて1回だけ実行
-        texts_to_sum = [chunk_texts[idx] for idx in picked]
-        print(f"Summarizing {len(texts_to_sum)} chunks in one request...")
-        summaries = self._summarize_for_context_batch(texts_to_sum)
-    
-        selected = []
-        for idx, summary in zip(picked, summaries):
-            meta = chunk_meta[idx]
-            selected.append(f"出典: {meta['title']} | {meta['url']}\n要点:\n{summary}")
-    
-        return selected, used_sources
+    @staticmethod
+    def _site_from_url(url: str) -> str:
+        match = re.match(r"https?://([^/]+)", url)
+        return (match.group(1) if match else url).replace("www.", "")
 
-
-    def _summarize_for_context(self, text: str) -> str:
-        # いよ観ネットのポリシーに配慮: 引用ではなく短い要点箇条書き
-        prompt = (
-            "以下の観光記事テキストから、固有名詞と実用情報（場所・体験・時期・所要時間・注意点）を日本語で5点以内に簡潔要約してください。n"
-            "**原文の連続した引用は禁止。必ず言い換え・要約で**。最大400字。nn" + text[:4000]
-        )
-        resp = self.gclient.models.generate_content(
-            model="gemini-2.5-flash-lite",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-            ),
-        )
-        return resp.text.strip()
-
-    def _summarize_for_context_batch(self, texts: List[str]) -> List[str]:
-        """
-        複数チャンクを1回の generate_content で要約して返す（順序維持）。
-        返り値は texts と同じ長さの summary リスト。
-        """
-        # JSONで返させる（順序通りの配列）
-        joined = "\n\n".join(
-            [f"### CHUNK {i+1}\n{t[:4000]}" for i, t in enumerate(texts)]
-        )
-    
-        prompt = (
-            "以下の複数の観光記事テキストを、それぞれ日本語で要点要約してください。\n"
-            "- 各チャンクは固有名詞と実用情報（場所・体験・時期・所要時間・注意点）を中心に5点以内\n"
-            "- 原文の連続した引用は禁止。必ず言い換え・要約で\n"
-            "- 1チャンクあたり最大400字\n"
-            "出力は必ず JSON で、次の形式にしてください：\n"
-            '{"summaries": ["要約1", "要約2", "..."]}\n\n'
-            + joined
-        )
-    
-        # 503/429 対策：軽いリトライ（必要最小限）
-        last_err = None
-        for attempt in range(4):
-            try:
-                resp = self.gclient.models.generate_content(
-                    model="gemini-2.5-flash-lite",
-                    contents=prompt,
-                    config={
-                        "response_mime_type": "application/json",
-                        # thinking を切って軽量化したい場合（任意）
-                        "thinking_config": {"thinking_budget": 0},
-                    },
-                )
-                data = json.loads(resp.text)
-                summaries = data.get("summaries", [])
-                # 長さ不一致の保険
-                if not isinstance(summaries, list) or len(summaries) != len(texts):
-                    return ["" for _ in texts]
-                return [str(s).strip() for s in summaries]
-            except Exception as e:
-                last_err = e
-                msg = str(e)
-                # 429/503 の場合だけ待って再試行
-                if ("429" in msg) or ("RESOURCE_EXHAUSTED" in msg) or ("503" in msg) or ("UNAVAILABLE" in msg) or ("overloaded" in msg):
-                    time.sleep(min(60, 2 ** attempt * 4))
-                    continue
-                raise
-        raise last_err
-
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        if not text:
+            return ""
+        soup = BeautifulSoup(text, "html.parser")
+        cleaned = soup.get_text(separator="\n")
+        cleaned = html.unescape(cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+        return cleaned.strip()

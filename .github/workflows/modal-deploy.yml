@@ -1,0 +1,45 @@
+name: Modal Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "modal_backend.py"
+      - "requirements-modal.txt"
+      - ".github/workflows/modal-deploy.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modal-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Modal vLLM backend
+    runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Modal CLI
+        run: python -m pip install --upgrade pip && pip install -r requirements-modal.txt
+
+      - name: Validate Modal credentials are present
+        run: |
+          test -n "$MODAL_TOKEN_ID"
+          test -n "$MODAL_TOKEN_SECRET"
+
+      - name: Deploy Modal application
+        run: modal deploy modal_backend.py
