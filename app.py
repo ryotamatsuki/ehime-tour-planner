@@ -323,11 +323,12 @@ if st.session_state.plan_json:
             )
             r4.metric("候補spot数", retrieval_metrics.get("candidate_count", "—"))
 
-            l1, l2, l3, l4 = st.columns(4)
+            l1, l2, l3, l4, l5 = st.columns(5)
             l1.metric("LLM API", seconds_label(llm_metrics.get("elapsed_ms")))
             l2.metric("LLM phase", llm_metrics.get("phase", "—"))
             l3.metric("retry", llm_metrics.get("retries", "—"))
-            l4.metric(
+            l4.metric("retry待機", seconds_label(llm_metrics.get("retry_wait_ms")))
+            l5.metric(
                 "tokens",
                 (
                     f"{llm_metrics.get('prompt_tokens', '—')} → "
