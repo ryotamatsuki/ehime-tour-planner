@@ -253,7 +253,7 @@ class PlannerWorkflow:
             "planner_metrics strategy=%s timings=%s last_llm=%s",
             result.get("generation_strategy", "unknown"),
             timings,
-            self.llm.last_request_metrics,
+            getattr(self.llm, "last_request_metrics", {}),
         )
         return result
 
@@ -272,7 +272,7 @@ class PlannerWorkflow:
         LOGGER.info(
             "planner_refine_metrics timings=%s last_llm=%s",
             timings,
-            self.llm.last_request_metrics,
+            getattr(self.llm, "last_request_metrics", {}),
         )
         return result
 
