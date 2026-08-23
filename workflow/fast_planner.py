@@ -203,6 +203,28 @@ def hydrate_spot_bundle(
                     )
                 )
 
+        if not schedule and compact_day.spots:
+            # If the candidate catalog contains only one option, preserving one
+            # schedule entry is safer than returning an invalid empty day.
+            choice = compact_day.spots[0]
+            candidate = by_id[choice.spot_id]
+            url = str(candidate["url"])
+            title = str(candidate["title"]).strip() or choice.spot_id
+            schedule.append(
+                {
+                    "time": choice.time,
+                    "activity": choice.activity,
+                    "spot": title[:48],
+                    "address": "",
+                    "url": url,
+                    "tip": choice.tip,
+                }
+            )
+            if url not in source_urls:
+                source_urls.append(url)
+            if choice.spot_id not in used_ids:
+                used_ids.append(choice.spot_id)
+
         days.append(
             {
                 "day": compact_day.day,
