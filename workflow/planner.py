@@ -177,7 +177,9 @@ class PlannerWorkflow:
         context, sources = self.retriever.retrieve_for_plan(
             items=items,
             user_query=state["query"],
-            k=8,
+            # Keep enough evidence for grounding while leaving headroom under
+            # Sarashina/vLLM's 8,192-token context limit.
+            k=6,
         )
         if not context:
             raise RuntimeError("関連情報を取得できませんでした。検索条件を変えてください。")
